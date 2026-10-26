@@ -38,8 +38,8 @@ st.set_page_config(
 st.title("⚡ AI-Driven Adaptive Consensus Mechanism for IoT Networks")
 st.markdown("### Energy-Aware Dynamic Committee Selection & Quorum Settlement Layer")
 
-# Initialize Session State
-if "initialized" not in st.session_state:
+def init_or_reset_simulation():
+    """Initializes or completely resets the fleet simulation state."""
     st.session_state.fleet_size = 14
     st.session_state.simulator = IoTFleetSimulator(node_count=st.session_state.fleet_size, seed=42)
     st.session_state.weights = ObjectiveWeights(w_security=0.35, w_energy=0.45, w_latency=0.20)
@@ -61,11 +61,16 @@ if "initialized" not in st.session_state:
     st.session_state.cumulative_pbft_j = 0.0
     st.session_state.initialized = True
 
+# Initialize Session State if not present
+if not st.session_state.get("initialized", False):
+    init_or_reset_simulation()
+
 # Sidebar Controls
 st.sidebar.header("⚙️ Consensus & Fleet Controls")
 
 if st.sidebar.button("🔄 Reset Fleet & Ledger"):
-    st.session_state.initialized = False
+    init_or_reset_simulation()
+    st.sidebar.success("Fleet, batteries & ledger reset successfully!")
     st.rerun()
 
 st.sidebar.subheader("Objective Function Weights")
@@ -79,8 +84,11 @@ st.session_state.optimizer.weights = st.session_state.weights
 st.sidebar.subheader("🔋 Simulation Physics & Drain Rate")
 drain_speed = st.sidebar.slider(
     "Discharge Acceleration",
-    1.0, 5000.0, 1500.0, 250.0,
-    help="Accelerates simulation physical discharge so battery bars visibly deplete across 10-20 rounds"
+    min_value=100,
+    max_value=10000,
+    value=2500,
+    step=100,
+    help="Accelerates simulation physical discharge so battery bars visibly deplete across 10-20 rounds (includes 5000 and up to 10000)"
 )
 
 st.sidebar.subheader("🚨 Adversarial & Stress Injection")
