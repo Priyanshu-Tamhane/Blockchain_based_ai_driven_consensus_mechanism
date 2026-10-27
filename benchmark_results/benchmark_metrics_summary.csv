@@ -1,0 +1,4 @@
+Protocol,Rounds Executed,First Node Dead (FND) Round,Network Half-Life Round,Partition Round (Quorum Loss),Total Energy Dissipated (Joules),Energy Savings vs PBFT (%),Total Messages Exchanged,Final Alive Nodes
+Static PBFT,93,6,59,94,352470.1,0.0,6850,3
+Static PoS (Fixed Stake),30,15,,31,48403.84,86.27,240,12
+AI Adaptive Consensus,100,,,,246201.27,30.15,954,14

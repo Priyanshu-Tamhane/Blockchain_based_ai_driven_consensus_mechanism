@@ -71,39 +71,46 @@ npx hardhat test
 ```
 *Expected output: `5 passing`.*
 
-### B. Run Mathematical, Physics, DRL & Byzantine Defense Tests (Pytest)
-Executes 26 automated unit tests verifying Heinzelman radio physics ($d^2 / d^4$), crossover distance ($87.7\text{m}$), multi-objective utility functions, MDP gym environment, Actor-Critic networks, telemetry spoofing detection, equivocation slashing, and Sybil filtering:
+### B. Run Complete Automated Unit & Integration Tests (Pytest)
+Executes all 29 automated tests verifying Heinzelman radio physics, crossover distance, multi-objective utility functions, Gymnasium MDP environment, Actor-Critic networks, telemetry spoofing detection, equivocation slashing, Sybil filtering, and comparative benchmarks:
 ```bash
 python -m pytest tests/ -v
 ```
-*Expected output: `26 passed in ~11s`.*
+*Expected output: `29 passed in ~13s`.*
 
-### C. Run the Phase 5 Adversarial Stress Testing & Byzantine Slashing Pipeline
+### C. Run the Phase 6 Empirical Benchmarking & Comparative Pipeline
+Executes a 100-round head-to-head evaluation against Classical Static PBFT and Fixed PoS under identical radio physics, generating publication-ready charts in `benchmark_results/`:
+```bash
+python run_phase6_pipeline.py
+```
+*Outputs: `battery_decay_curves.png`, `cumulative_energy_comparison.png`, `network_survival_curves.png`, `message_complexity_scaling.png`, and `benchmark_metrics_summary.json`.*
+
+### D. Run the Phase 5 Adversarial Stress Testing & Byzantine Slashing Pipeline
 Demonstrates active defense under 4 attack vectors (Telemetry Spoofing, Double-Signing Equivocation, Sybil Infiltration, and Validator Silent Dropping), with real-time anomaly detection and on-chain slashing:
 ```bash
 python run_phase5_pipeline.py
 ```
 
-### D. Run the Phase 4 Deep RL Consensus Pipeline (Terminal Demo)
+### E. Run the Phase 4 Deep RL Consensus Pipeline (Terminal Demo)
 Demonstrates the trained Actor-Critic (PPO) neural policy dynamically sizing committees, electing leaders based on neural logits, verifying ECDSA quorum, and calculating Heinzelman energy savings:
 ```bash
 python run_phase4_pipeline.py
 ```
 
-### E. (Optional) Re-Train the Deep RL (PPO) Agent
+### F. (Optional) Re-Train the Deep RL (PPO) Agent
 To re-train the PPO agent from scratch through the Gymnasium environment:
 ```bash
 python ai_engine/train_rl.py
 ```
 *Outputs: `models/drl_consensus_agent.pt`.*
 
-### F. Run the Phase 3 Heuristic (MCDM) Pipeline
+### G. Run the Phase 3 Heuristic (MCDM) Pipeline
 Demonstrates the original multi-criteria utility heuristic and leadership fatigue load balancing:
 ```bash
 python run_phase3_pipeline.py
 ```
 
-### G. Launch the Real-Time Streamlit Visual Dashboard
+### H. Launch the Real-Time Streamlit Visual Dashboard
 Launches the interactive GUI for presentations and reviews:
 ```bash
 streamlit run dashboard/app.py
@@ -117,12 +124,12 @@ streamlit run dashboard/app.py
   * **Comparative Energy Graph:** Real-time plot comparing cumulative energy dissipation of **Adaptive Consensus** vs. **Static PBFT** (showing a 98.3% energy saving for resting nodes).
   * **Live Blockchain Ledger:** Real-time log of committed blocks, state roots, and quorum signatures with active AI engine tags.
 
-### H. (Optional) Generate the Microsoft Word Report
-To re-generate the full project documentation document (`.docx`):
+### I. Generate the Publication Word Dissertation Report
+Generates the complete technical report with embedded publication figures, empirical tables, and viva Q&A:
 ```bash
 python generate_report_docx.py
 ```
-*Outputs: `AI_Driven_Consensus_Project_Report.docx`.*
+*Outputs: `AI_Driven_Consensus_Project_Report.docx` (1.15 MB).*
 
 ---
 
@@ -186,6 +193,17 @@ AI_driven_consensus/
 ├── models/                           # Trained Neural Model Weights
 │   └── drl_consensus_agent.pt        # Serialized PyTorch Actor-Critic weights
 │
+├── benchmark/                        # TIER 2: Empirical Benchmarking Engine
+│   ├── benchmark_engine.py           # Multi-protocol comparative runner (PBFT, PoS, Adaptive)
+│   └── plot_generator.py             # Publication figure generator & metrics exporter
+│
+├── benchmark_results/                # Generated Publication Assets & Reports
+│   ├── battery_decay_curves.png      # Node battery trajectory curves
+│   ├── cumulative_energy_comparison.png # Joules dissipated vs rounds
+│   ├── network_survival_curves.png   # Kaplan-Meier survival & FND curves
+│   ├── message_complexity_scaling.png# O(N^2) vs O(K^2) message curves
+│   └── benchmark_metrics_summary.json# Tabular metrics summary export
+│
 ├── bridge/                           # Web3 Orchestration Layer
 │   ├── web3_client.py                # Python Web3.py wrapper for EVM JSON-RPC calls
 │   └── orchestrator.py               # End-to-end consensus round coordinator with defense
@@ -197,8 +215,10 @@ AI_driven_consensus/
 │   ├── test_math_models.py           # Pytest suite for radio physics & AI math (9 tests)
 │   ├── test_drl_agent.py             # Pytest suite for Gym MDP & DRL networks (6 tests)
 │   ├── test_adversarial_defense.py   # Pytest suite for Byzantine defense & slashing (11 tests)
+│   ├── test_benchmarks.py            # Pytest suite for benchmarking metrics (3 tests)
 │   └── contracts/ConsensusTest.js    # Hardhat test suite for EVM contracts (5 tests)
 │
+├── run_phase6_pipeline.py            # Phase 6 Empirical Benchmarking Execution Script
 ├── run_phase5_pipeline.py            # Phase 5 Adversarial Stress & Slashing Pipeline
 ├── run_phase4_pipeline.py            # Phase 4 DRL Pipeline Execution Script
 ├── run_phase3_pipeline.py            # Phase 3 MCDM Prototype Execution Script

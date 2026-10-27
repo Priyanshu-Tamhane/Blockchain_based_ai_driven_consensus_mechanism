@@ -71,10 +71,10 @@ def create_document():
     meta_table = doc.add_table(rows=4, cols=2)
     meta_table.alignment = WD_TABLE_ALIGNMENT.CENTER
     meta_data = [
-        ("Domain:", "Blockchain, Internet of Things (IoT), Edge AI & Multi-Agent Consensus"),
-        ("Milestone:", "Mid-Semester Review Deliverable (Phase 1, Phase 2, & Phase 3)"),
-        ("Target System:", "Decoupled 3-Tier Architecture (EVM Settlement + Off-Chain AI Controller)"),
-        ("Date / Version:", "September 2026 / Version 1.0 (Functional Prototype Verified)")
+        ("Domain:", "Blockchain, Internet of Things (IoT), Edge AI & Deep Reinforcement Learning"),
+        ("Milestone:", "Final Project Report (Phases 1 through 6 Complete)"),
+        ("Target System:", "Decoupled 3-Tier Architecture (EVM Settlement + DRL Off-Chain Controller)"),
+        ("Date / Version:", "October 2026 / Version 2.0 (Full Empirical Benchmarking & Defense Verified)")
     ]
     for row_idx, (k, v) in enumerate(meta_data):
         row = meta_table.rows[row_idx]
@@ -116,6 +116,13 @@ def create_document():
         p.paragraph_format.line_spacing = 1.15
         if bold_prefix:
             p.add_run(bold_prefix).bold = True
+        p.add_run(text)
+        return p
+
+    def add_bullet(text):
+        p = doc.add_paragraph(style="List Bullet")
+        p.paragraph_format.space_after = Pt(3)
+        p.paragraph_format.line_spacing = 1.15
         p.add_run(text)
         return p
 
@@ -278,58 +285,144 @@ def create_document():
         "to 10%, the AI immediately quarantined it to deep sleep, promoting Node 02 as the new leader without interrupting block finalization."
     )
 
-    # 6. Future Project Roadmap (Phases 4, 5, 6)
-    add_h1("6. Post Mid-Term Roadmap & Complete Project Vision")
-    add_h2("6.1 Phase 4: Advancing to Deep Reinforcement Learning (DQN / PPO)")
+    # 6. Phase 4: Machine Learning Advancement (Deep RL with PPO)
+    add_h1("6. Machine Learning Advancement: Deep Reinforcement Learning (Phase 4)")
     add_p(
-        "In Phase 4, the static Multi-Criteria Decision Making (MCDM) heuristic will be replaced with a Deep Reinforcement Learning agent. "
-        "The state space (S_t) comprises residual battery vectors, channel latency, packet drop rates, and block finality intervals. "
-        "The action space (A_t) determines the dynamic committee size K_t and the node selection mask. The agent learns non-linear "
-        "policies that anticipate depletion cascades before they occur."
+        "To elevate the system beyond static heuristic weighting, Phase 4 formalizes dynamic committee selection as a "
+        "Markov Decision Process (MDP) implemented in an OpenAI Gymnasium environment (IoTConsensusEnv). An Actor-Critic neural "
+        "network trained using Proximal Policy Optimization (PPO) with Generalized Advantage Estimation (GAE) learns non-linear "
+        "policies that anticipate fleet depletion cascades under volatile network traffic."
+    )
+    add_h2("6.1 State and Action Space Formulations")
+    add_p(
+        "Observation Space (S_t in R^(4N + 2)): For each of the N IoT nodes, the state vector captures: [Residual Battery %, "
+        "Link Latency ms, Historical Reputation Score, Leadership Fatigue Ratio]. This is concatenated with two global scalars: "
+        "the fleet viability ratio (nodes above 15% battery) and normalized epoch progress."
+    )
+    add_p(
+        "Action Space (A_t in R^(N + 1)): The continuous action vector outputs a continuous logit for dynamic committee sizing K_t "
+        "(decoded via sigmoid into the valid Byzantine range [3f+1, K_max]), alongside N continuous priority logits for candidate ranking."
+    )
+    add_h2("6.2 Composite Multi-Objective Reward Function")
+    add_p(
+        "The PPO policy optimizes a composite reward function balancing consensus speed, fleet battery uniformity, and Byzantine safety:\n"
+        "R_t = +3.0 * 1_consensus + 1.5 * E_mean - 1.0 * Var(E) - 1.2 * Latency_mean - 2.0 * ((K_t - K_min)/(K_max - K_min)) - P_BFT\n"
+        "Where P_BFT = -15.0 penalizes invariant failures. Pre-trained weights were converged across 60 episodes and saved to models/drl_consensus_agent.pt."
     )
 
-    add_h2("6.2 Phase 5: Adversarial Stress Testing & Byzantine Defense")
+    # 7. Phase 5: Adversarial Stress Testing & Byzantine Slashing Defense
+    add_h1("7. Adversarial Stress Testing & Byzantine Slashing Defense (Phase 5)")
     add_p(
-        "Phase 5 introduces explicit adversarial injection: (1) Telemetry Spoofing (dishonest nodes reporting false battery levels to avoid "
-        "work or hijack leadership), mitigated via Kalman filtering and physics cross-validation; (2) Byzantine Double-Signing, mitigated "
-        "via on-chain cryptographic slashing in NodeRegistry.sol that zeroes reputation and permanently revokes validator status."
+        "Phase 5 introduces an automated attack injection and defense layer safeguarding the decentralized protocol against malicious, "
+        "selfish, and faulty devices."
+    )
+    add_h2("7.1 Attack Vector Formulations")
+    add_bullet("Telemetry Spoofing (Free-Rider): Low-battery nodes falsify their telemetry packets, reporting 100% battery and 5 ms latency to game the AI into selecting them as leader.")
+    add_bullet("Byzantine Equivocation: A malicious validator produces two conflicting block proposal signatures for the same epoch (double-signing).")
+    add_bullet("Sybil Infiltration: An unregistered cryptographic identity attempts to inject unauthorized votes into the quorum pool.")
+    add_bullet("Silent Dropping (DoS): An elected validator abruptly stops transmitting, simulating packet drops, network partitions, or node death.")
+
+    add_h2("7.2 Multi-Tier Defense Mechanisms")
+    add_p(
+        "1. Physics-Informed Heinzelman Consistency Checker: The AI controller checks incoming battery claims against the theoretical "
+        "minimum discharge from the previous round's role. If a node reports an impossible positive jump or fails to dissipate expected radio "
+        "energy, it is flagged as a free-rider, its reading is corrected, and its reputation is degraded by 50%.\n"
+        "2. Cryptographic Equivocation Slasher: Conflicting signatures for identical epochs are verified via ecrecover. Upon cryptographic "
+        "proof confirmation, the offending node is slashed on-chain in NodeRegistry.sol, zeroing its reputation and permanently disqualifying it.\n"
+        "3. Whitelist Sybil Filter: Unregistered identities are rejected before vote aggregation, preventing Sybil attacks.\n"
+        "4. Byzantine Liveness Guard: Quorum threshold guarantees that consensus finality proceeds uninterrupted as long as faults <= f."
     )
 
-    add_h2("6.3 Phase 6: Empirical Benchmarking & Final Thesis Defense")
+    # 8. Phase 6: Empirical Benchmarking & Comparative Evaluation
+    add_h1("8. Empirical Benchmarking & Research Evaluation (Phase 6)")
     add_p(
-        "Phase 6 provides academic evaluation against two industry baselines: Classical Static PBFT and Standard Stake-based PoS. "
-        "Evaluated metrics include First Node Dead (FND, target 2.5x to 4x extension), Network Half-Life, Transaction Throughput (TPS), "
-        "and EVM execution gas costs optimized using bitmap storage."
+        "To rigorously quantify research contributions, Phase 6 conducts long-horizon comparative simulations against two foundational "
+        "paradigms under identical radio physics: (1) Classical Static PBFT, and (2) Static Stake-Based PoS with fixed validators."
     )
 
-    # 7. Complete 10-Slide Presentation Script
-    add_h1("7. Complete 10-Slide Mid-Semester Presentation Script")
+    # Benchmark Results Table
+    bench_table = doc.add_table(rows=4, cols=6)
+    bench_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    bench_headers = ["Consensus Protocol", "FND (Round)", "Half-Life", "Energy (J)", "Messages", "Energy Saved %"]
+    for c_idx, h in enumerate(bench_headers):
+        cell = bench_table.rows[0].cells[c_idx]
+        cell.paragraphs[0].add_run(h).bold = True
+        set_cell_background(cell, "1F4E79")
+        set_cell_margins(cell, 80, 80, 100, 100)
+        cell.paragraphs[0].runs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+    bench_data = [
+        ("Static PBFT (All N=14)", "Round 6", "Round 59", "352,470 J", "6,850", "0.0% (Baseline)"),
+        ("Static PoS (Fixed Stake)", "Round 15", "None (>100)", "48,404 J", "240", "86.3% (Unbalanced)"),
+        ("AI Adaptive Consensus", "None (>100)", "None (>100)", "246,201 J", "954", "30.1% (Balanced)")
+    ]
+    for r_idx, row_data in enumerate(bench_data):
+        row = bench_table.rows[r_idx + 1]
+        for c_idx, val in enumerate(row_data):
+            cell = row.cells[c_idx]
+            cell.paragraphs[0].add_run(val)
+            set_cell_background(cell, "FFFFFF" if r_idx % 2 == 0 else "F9FBFD")
+            set_cell_margins(cell, 60, 60, 100, 100)
+
+    add_callout(
+        "Key Empirical Finding: In Static PBFT, the first node dies in Round 6 due to continuous N^2 broadcasts. In Static PoS, the fixed leader "
+        "burns out in Round 15, partitioning the network. In AI Adaptive Consensus, ZERO nodes died across all 100 rounds (FND > 100), "
+        "representing an over 6.67x extension in operational lifespan over PoS, and over 16x extension over PBFT.",
+        title="BENCHMARK BREAKTHROUGH"
+    )
+
+    add_h2("8.1 Publication Figures & Graphical Analysis")
+    import os
+    fig_dir = "benchmark_results"
+    charts = [
+        ("battery_decay_curves.png", "Figure 1: Individual Node Battery Decay Curves Across Consensus Paradigms. Demonstrates uniform, balanced discharge in Adaptive Consensus versus rapid single-node burnout in PoS and parallel collapse in PBFT."),
+        ("cumulative_energy_comparison.png", "Figure 2: Cumulative Energy Dissipation Trajectory. Adaptive Consensus preserves over 30% total fleet energy compared to PBFT while maintaining full BFT security."),
+        ("network_survival_curves.png", "Figure 3: Network Survival & Node Longevity Curves. Highlights First Node Dead (FND) and Network Half-Life resilience under dynamic AI role rotation."),
+        ("message_complexity_scaling.png", "Figure 4: Communication Message Complexity Scaling. Compares O(N^2) quadratic messaging in PBFT versus O(K^2) bounded messaging in AI Adaptive Consensus as network size scales from 10 to 100 devices.")
+    ]
+    for filename, caption in charts:
+        img_path = os.path.join(fig_dir, filename)
+        if os.path.exists(img_path):
+            p_img = doc.add_paragraph()
+            p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_picture(img_path, width=Inches(5.8))
+            p_cap = doc.add_paragraph()
+            p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_cap.paragraph_format.space_after = Pt(14)
+            p_cap.add_run(caption).italic = True
+
+    # 9. Complete 10-Slide Presentation Script
+    add_h1("9. Complete 10-Slide Project Presentation Script")
     slides_content = [
-        ("Slide 1: Title & Overview", "AI-Driven Adaptive Consensus Mechanism for Energy-Efficient Blockchain IoT Networks. Introduces the decoupled 3-tier model balancing decentralized security with device battery preservation."),
-        ("Slide 2: The Core Problem", "Details why traditional blockchains fail on IoT hardware: PoW exhausts battery in hours, PBFT causes O(N^2) broadcast packet storms, and PoS is energy-blind, killing peripheral sensors."),
-        ("Slide 3: Proposed Architecture", "Explains the 3-tier boundary: Tier 1 Simulated IoT Devices -> Tier 2 Edge AI Controller -> Tier 3 Solidity Smart Contracts on the EVM."),
-        ("Slide 4: Mathematical Formulations", "Presents the Heinzelman first-order radio model, the BFT safety bound (K_t >= 3f + 1), and the multi-objective global utility function (U_t = w1*S + w2*E - w3*L)."),
-        ("Slide 5: Prototype Implementation", "Details the implementation: NodeRegistry.sol and AdaptiveConsensus.sol tested in Hardhat, virtual ESP32 nodes with ECDSA secp256k1 signing, and Web3.py integration."),
-        ("Slide 6: Demonstration & Results", "Highlights prototype results: 98.3% energy reduction for idle nodes, automated leader fatigue rotation, dynamic 10% battery quarantine stress test, and the interactive Streamlit dashboard."),
-        ("Slide 7: Roadmap Phase 4 (Deep RL)", "Details replacing static heuristics with a Deep Reinforcement Learning (PPO/DQN) agent to learn non-linear policies under changing IoT network traffic."),
-        ("Slide 8: Roadmap Phase 5 (Byzantine Attacks)", "Details threat mitigation: Kalman filter anomaly detection against telemetry battery spoofing, and on-chain cryptographic slashing for double-signing."),
-        ("Slide 9: Roadmap Phase 6 (Benchmarking)", "Outlines benchmarking against Classical PBFT and PoS on First Node Dead (FND), network half-life, message complexity, and EVM gas profiling."),
-        ("Slide 10: Conclusion & Deliverables", "Summarizes the mid-semester deliverables, project timeline leading to the final semester defense, and the research contribution of an energy-aware IoT blockchain."),
+        ("Slide 1: Title & Overview", "AI-Driven Adaptive Consensus Mechanism for Energy-Efficient Blockchain IoT Networks. Introduces the decoupled 3-tier architecture balancing decentralized Byzantine security with microcontroller battery preservation."),
+        ("Slide 2: The Core Problem", "Details why canonical consensus fails on IoT hardware: PoW exhausts battery in hours, PBFT causes O(N^2) packet collision storms, and PoS is energy-blind, burning out peripheral sensors."),
+        ("Slide 3: Theoretical System & Radio Physics", "Presents the Heinzelman first-order radio model, the crossover threshold (d0 = 87.71m), and the BFT safety floor (K_t >= 3f + 1, Quorum = floor(2/3*K) + 1)."),
+        ("Slide 4: Decoupled 3-Tier Architecture", "Explains architectural separation: Tier 1 Virtual ESP32 Fleet -> Tier 2 Edge AI Controller / Oracle -> Tier 3 Solidity Smart Contracts on the EVM (NodeRegistry.sol and AdaptiveConsensus.sol)."),
+        ("Slide 5: Phase 4 Deep Reinforcement Learning", "Details upgrading to Actor-Critic PPO policy network trained in a Gymnasium MDP environment, optimizing composite rewards over a 58-dimensional state space."),
+        ("Slide 6: Phase 5 Adversarial Attack Suite", "Outlines simulated attacks: Telemetry Spoofing, Byzantine Double-Signing, Sybil Infiltration, and Validator Silent Dropping, with automated physics-based sanitization and on-chain slashing."),
+        ("Slide 7: Phase 6 Empirical Benchmarking", "Compares performance against Static PBFT and Fixed PoS over 100 rounds: Adaptive Consensus extends First Node Dead (FND) by over 6.67x over PoS and over 16x over PBFT."),
+        ("Slide 8: Communication & Scalability Gains", "Demonstrates reduction of message complexity from quadratic O(N^2) to bounded O(K^2), cutting network packets by 86% and eliminating RF broadcast storms."),
+        ("Slide 9: Interactive Demonstration Interface", "Showcases the real-time Streamlit dashboard with DRL/MCDM toggle, live fleet battery gauges, attack injection controls, and on-chain security audit logging."),
+        ("Slide 10: Conclusion & Deliverables", "Summarizes key contributions: complete 6-phase codebase, 29 passing unit tests, verified EVM contracts, publication-ready figures, and full thesis documentation."),
     ]
     for title, desc in slides_content:
         add_p(f"{desc}", f"{title}: ")
 
-    # 8. Review Panel Defense Q&A
-    add_h1("8. Review Panel Defense & Viva Q&A Guide")
+    # 10. Review Panel Defense Q&A
+    add_h1("10. Review Panel Defense & Viva Q&A Guide")
     qa_list = [
         ("Q: Why is Solidity necessary if the AI runs off-chain?",
-         "Defense: Smart contracts cannot perform floating-point math or neural network inferences within block gas limits. However, IoT networks still require a trustless, decentralized ledger for identity registry, slashing, and quorum verification. Solidity acts as the immutable settlement layer, while Python acts as the intelligent off-chain compute engine."),
+         "Defense: Smart contracts cannot perform floating-point neural network inferences or multi-criteria optimization within block gas limits. However, IoT networks require an immutable, trustless ledger for identity registry, slashing, and quorum verification. Solidity acts as the decentralized settlement layer, while Python acts as the off-chain Edge AI compute engine."),
         ("Q: Why not scale the committee down to 2 nodes to save even more power?",
-         "Defense: Byzantine Fault Tolerance mathematically requires K >= 3f + 1 to prevent double-spending and network forks. For f = 1 malicious or offline node, the committee must have at least 4 nodes. Our AI algorithm enforces this invariant as a hard constraint."),
+         "Defense: Byzantine Fault Tolerance mathematically requires K >= 3f + 1 to prevent double-spending and network forks. For f = 1 malicious or offline node, the committee must have at least 4 nodes. Our AI algorithm enforces this invariant as a non-negotiable hard constraint."),
         ("Q: How does rotating nodes conserve device battery?",
          "Defense: In wireless IoT devices, radio transmission is the dominant source of power loss. In standard PBFT, all N nodes participate in every round (O(N^2) complexity). By dynamically selecting a smaller committee (K << N) and rotating low-battery devices into low-power idle sleep (15 uA), resting devices consume 98.3% less energy per round, significantly extending fleet survival."),
-        ("Q: How do you prevent a node from lying about having 5% battery to avoid work?",
-         "Defense: In Phase 5, we introduce an anomaly detection filter. The controller maintains a historical model of expected energy drain based on past validation duties. If a node reports 5% battery despite being idle, or claims 99% after signing 100 blocks, it is flagged, disqualified, and penalized on-chain.")
+        ("Q: How do you prevent a node from lying about having 100% battery to seize leadership?",
+         "Defense: In Phase 5, we introduced a physics-informed anomaly detector. The controller maintains a historical model of expected energy drain based on past validation duties under the Heinzelman radio model. If an active node reports an impossible positive battery increase or claims 100% after signing blocks, it is flagged as a free-rider, its telemetry is corrected, and its reputation is degraded by 50%."),
+        ("Q: What happens if a malicious node signs two conflicting blocks at the same epoch?",
+         "Defense: This constitutes Byzantine Equivocation. The defense detector verifies both conflicting ECDSA signatures using ecrecover. Upon proof verification, it invokes slashNode on NodeRegistry.sol, zeroing the node's reputation and permanently blacklisting it from all future committees."),
+        ("Q: How does the AI policy achieve load balancing across the fleet?",
+         "Defense: Both the MCDM utility function and the DRL policy network incorporate a leadership fatigue penalty. After leading a round, a node incurs a high participation penalty, preventing consecutive-term monopolies and forcing dynamic round-robin rotation among the healthiest nodes.")
     ]
     for q, a in qa_list:
         p = doc.add_paragraph()
@@ -340,7 +433,7 @@ def create_document():
 
     output_path = "AI_Driven_Consensus_Project_Report.docx"
     doc.save(output_path)
-    print(f"[SUCCESS] Word document generated successfully: {output_path}")
+    print(f"[SUCCESS] Final Word document generated successfully: {output_path}")
 
 
 if __name__ == "__main__":

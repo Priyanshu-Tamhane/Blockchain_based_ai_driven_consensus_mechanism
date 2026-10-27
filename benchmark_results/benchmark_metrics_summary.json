@@ -1,0 +1,35 @@
+{
+    "Static PBFT": {
+        "Protocol": "Static PBFT",
+        "Rounds Executed": 93,
+        "First Node Dead (FND) Round": 6,
+        "Network Half-Life Round": 59,
+        "Partition Round (Quorum Loss)": 94,
+        "Total Energy Dissipated (Joules)": 352470.1,
+        "Energy Savings vs PBFT (%)": 0.0,
+        "Total Messages Exchanged": 6850,
+        "Final Alive Nodes": 3
+    },
+    "Static PoS (Fixed Stake)": {
+        "Protocol": "Static PoS (Fixed Stake)",
+        "Rounds Executed": 30,
+        "First Node Dead (FND) Round": 15,
+        "Network Half-Life Round": null,
+        "Partition Round (Quorum Loss)": 31,
+        "Total Energy Dissipated (Joules)": 48403.84,
+        "Energy Savings vs PBFT (%)": 86.27,
+        "Total Messages Exchanged": 240,
+        "Final Alive Nodes": 12
+    },
+    "AI Adaptive Consensus": {
+        "Protocol": "AI Adaptive Consensus",
+        "Rounds Executed": 100,
+        "First Node Dead (FND) Round": null,
+        "Network Half-Life Round": null,
+        "Partition Round (Quorum Loss)": null,
+        "Total Energy Dissipated (Joules)": 246201.27,
+        "Energy Savings vs PBFT (%)": 30.15,
+        "Total Messages Exchanged": 954,
+        "Final Alive Nodes": 14
+    }
+}
