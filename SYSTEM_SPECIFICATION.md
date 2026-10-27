@@ -257,11 +257,20 @@ AI_driven_consensus/
 * Fully integrated `DRLCommitteeSelector` into both the interactive Streamlit dashboard (`dashboard/app.py`) and headless pipeline (`run_phase4_pipeline.py`).
 * Comprehensive test suite: 15/15 unit tests passing across math, physics, and neural agents.
 
-### Phase 5: Adversarial Stress Testing & Byzantine Defense (Post-Midterm Target)
-* Implement automated attack injection suites:
-  * Telemetry Spoofing / Free-rider attacks.
-  * Byzantine Double-signing and Sybil attacks.
-* Implement Kalman filter anomaly detection for telemetry cross-validation and automated on-chain slashing.
+### Phase 5: Adversarial Stress Testing & Byzantine Defense (Completed)
+* Implemented modular attack injection suite (`simulator/adversarial.py`):
+  * **Telemetry Spoofing (Free-Rider):** Simulates depleted nodes faking 100% battery and 5 ms latency to hijack leadership.
+  * **Byzantine Double-Signing (Equivocation):** Produces conflicting block proposals signed by the same keypair at the same epoch.
+  * **Sybil Infiltration:** Injects rogue votes signed by unregistered cryptographic identities.
+  * **Silent Dropping (DoS):** Simulates unresponsiveness of elected validators to test Byzantine quorum tolerance ($K_t \ge 3f + 1$).
+* Implemented **Byzantine Defense & Anomaly Detector Layer** (`ai_engine/defense_detector.py`):
+  * **Physics-Informed Sanitization:** Uses Heinzelman radio model equations to detect negative battery discharge and unphysical energy claims, sanitizing telemetry and penalizing reputation.
+  * **Cryptographic Equivocation Slashing:** Automatically verifies dual conflicting signatures via `ecrecover` / `Account.recover_message`, triggers on-chain slashing, zeroes reputation, and blacklists rogue nodes.
+  * **Sybil Whitelist Filter:** Drops unauthorized signatures before quorum aggregation.
+  * **Liveness & Quorum Assurance:** Guarantees consensus finality when faulty nodes $\le f$.
+* Full verification test suite: 11 automated security tests passing (`tests/test_adversarial_defense.py`). Total project tests: 26/26 passing.
+* Headless verification pipeline: `run_phase5_pipeline.py`.
+* Real-time UI integration in `dashboard/app.py`: Interactive attack triggers and security audit log table.
 
 ### Phase 6: Empirical Benchmarking & Final Thesis (Final Defense Target)
 * Headless benchmarking against **Classical PBFT** and **Stake-based PoS**.
@@ -288,18 +297,21 @@ npx hardhat test
 # 4. Install Python dependencies (PyTorch, Gymnasium, Web3, Streamlit, etc.)
 pip install -r requirements.txt
 
-# 5. Run all automated unit tests: math models, physics & DRL agent (15 passing)
+# 5. Run all 26 automated unit tests: math models, physics, DRL agent & Byzantine defense
 python -m pytest tests/ -v
 
 # 6. Train the Deep Reinforcement Learning (PPO) agent
 python ai_engine/train_rl.py
 
-# 7. Execute the Phase 3 (MCDM) headless consensus pipeline
+# 7. Execute the Phase 3 (MCDM Heuristic) headless consensus pipeline
 python run_phase3_pipeline.py
 
 # 8. Execute the Phase 4 (Deep RL Actor-Critic) headless pipeline
 python run_phase4_pipeline.py
 
-# 9. Launch the interactive Streamlit dashboard (supports MCDM & DRL toggle)
+# 9. Execute the Phase 5 (Adversarial Stress Testing & Slashing) headless pipeline
+python run_phase5_pipeline.py
+
+# 10. Launch the interactive Streamlit dashboard (supports MCDM/DRL toggle & Adversarial Suite)
 streamlit run dashboard/app.py
 ```

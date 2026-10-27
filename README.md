@@ -71,33 +71,39 @@ npx hardhat test
 ```
 *Expected output: `5 passing`.*
 
-### B. Run Mathematical, Radio Physics & DRL Tests (Pytest)
-Executes 15 automated unit tests verifying Heinzelman radio physics ($d^2 / d^4$), crossover distance ($87.7\text{m}$), multi-objective utility functions, MDP gym environment, Actor-Critic networks, and DRL policy inference:
+### B. Run Mathematical, Physics, DRL & Byzantine Defense Tests (Pytest)
+Executes 26 automated unit tests verifying Heinzelman radio physics ($d^2 / d^4$), crossover distance ($87.7\text{m}$), multi-objective utility functions, MDP gym environment, Actor-Critic networks, telemetry spoofing detection, equivocation slashing, and Sybil filtering:
 ```bash
 python -m pytest tests/ -v
 ```
-*Expected output: `15 passed in ~10s`.*
+*Expected output: `26 passed in ~11s`.*
 
-### C. Run the Phase 4 Deep RL Consensus Pipeline (Terminal Demo)
-Demonstrates the trained Actor-Critic (PPO) neural policy dynamically sizing committees, electing leaders based on neural logits, verifying ECDSA quorum, dissipating energy under the Heinzelman model, and reacting to adversarial battery crashes:
+### C. Run the Phase 5 Adversarial Stress Testing & Byzantine Slashing Pipeline
+Demonstrates active defense under 4 attack vectors (Telemetry Spoofing, Double-Signing Equivocation, Sybil Infiltration, and Validator Silent Dropping), with real-time anomaly detection and on-chain slashing:
+```bash
+python run_phase5_pipeline.py
+```
+
+### D. Run the Phase 4 Deep RL Consensus Pipeline (Terminal Demo)
+Demonstrates the trained Actor-Critic (PPO) neural policy dynamically sizing committees, electing leaders based on neural logits, verifying ECDSA quorum, and calculating Heinzelman energy savings:
 ```bash
 python run_phase4_pipeline.py
 ```
 
-### D. (Optional) Re-Train the Deep RL (PPO) Agent
+### E. (Optional) Re-Train the Deep RL (PPO) Agent
 To re-train the PPO agent from scratch through the Gymnasium environment:
 ```bash
 python ai_engine/train_rl.py
 ```
 *Outputs: `models/drl_consensus_agent.pt`.*
 
-### E. Run the Phase 3 Heuristic (MCDM) Pipeline
+### F. Run the Phase 3 Heuristic (MCDM) Pipeline
 Demonstrates the original multi-criteria utility heuristic and leadership fatigue load balancing:
 ```bash
 python run_phase3_pipeline.py
 ```
 
-### F. Launch the Real-Time Streamlit Visual Dashboard
+### G. Launch the Real-Time Streamlit Visual Dashboard
 Launches the interactive GUI for presentations and reviews:
 ```bash
 streamlit run dashboard/app.py
@@ -105,12 +111,13 @@ streamlit run dashboard/app.py
 *Open your browser at `http://localhost:8501`.*
 * **Features:**
   * **AI Engine Switcher:** Seamlessly toggle in real time between **Deep RL - PPO Agent (Phase 4)** and **Heuristic MCDM (Phase 3)**.
-  * **Real-time Fleet Grid:** Color-coded battery bars and role badges (`👑 ROUND LEADER`, `🛡️ VALIDATOR`, `💤 IDLE SLEEP`, `⚠️ QUARANTINED`).
-  * **Dynamic Rotation:** Leadership dynamically rotates among healthy nodes; click **"⚡ Force Drain to 10%"** to watch the AI automatically quarantine a low-battery node and promote a new leader!
+  * **Adversarial Attack Suite:** Live triggers for Telemetry Spoofing (100% fake battery), Byzantine Equivocation (Double-Signing), Sybil Vote Injection, and Validator Silent Dropping.
+  * **Byzantine Defense & Slashing Audit Log:** Real-time table logging security incidents, anomaly detections, and on-chain slashed nodes.
+  * **Real-time Fleet Grid:** Color-coded battery bars and role badges (`👑 ROUND LEADER`, `🛡️ VALIDATOR`, `💤 IDLE SLEEP`, `⚠️ QUARANTINED`, `⚔️ SLASHED & BLACKLISTED`).
   * **Comparative Energy Graph:** Real-time plot comparing cumulative energy dissipation of **Adaptive Consensus** vs. **Static PBFT** (showing a 98.3% energy saving for resting nodes).
   * **Live Blockchain Ledger:** Real-time log of committed blocks, state roots, and quorum signatures with active AI engine tags.
 
-### G. (Optional) Generate the Microsoft Word Report
+### H. (Optional) Generate the Microsoft Word Report
 To re-generate the full project documentation document (`.docx`):
 ```bash
 python generate_report_docx.py
@@ -166,29 +173,33 @@ AI_driven_consensus/
 │   ├── models.py                     # Data contracts (Telemetry, Directives, Votes)
 │   ├── energy_model.py               # Heinzelman First-Order Radio Model (d^2 / d^4)
 │   ├── iot_node.py                   # Virtual ESP32 node with ECDSA signing & discharge
-│   └── fleet_simulator.py            # Multi-node mesh manager & telemetry streaming
+│   ├── fleet_simulator.py            # Multi-node mesh manager & telemetry streaming
+│   └── adversarial.py                # Attack injector (Spoofing, Equivocation, Sybil, DoS)
 │
 ├── ai_engine/                        # TIER 2: Intelligent Committee Engine
 │   ├── objective.py                  # Multi-Objective MCDM utility function & BFT constraints
 │   ├── consensus_env.py              # Gymnasium MDP Environment for RL
 │   ├── drl_agent.py                  # Actor-Critic (PPO) Neural Network & Policy
-│   └── train_rl.py                   # PPO Agent Training Script
+│   ├── train_rl.py                   # PPO Agent Training Script
+│   └── defense_detector.py           # Physics-informed anomaly detection & slashing engine
 │
 ├── models/                           # Trained Neural Model Weights
 │   └── drl_consensus_agent.pt        # Serialized PyTorch Actor-Critic weights
 │
 ├── bridge/                           # Web3 Orchestration Layer
 │   ├── web3_client.py                # Python Web3.py wrapper for EVM JSON-RPC calls
-│   └── orchestrator.py               # End-to-end consensus round coordinator
+│   └── orchestrator.py               # End-to-end consensus round coordinator with defense
 │
 ├── dashboard/                        # Visual Presentation & Demo UI
-│   └── app.py                        # Streamlit real-time interactive dashboard (MCDM & DRL toggle)
+│   └── app.py                        # Streamlit dashboard (MCDM/DRL toggle & Adversarial Suite)
 │
 ├── tests/                            # Automated Verification Suites
 │   ├── test_math_models.py           # Pytest suite for radio physics & AI math (9 tests)
 │   ├── test_drl_agent.py             # Pytest suite for Gym MDP & DRL networks (6 tests)
+│   ├── test_adversarial_defense.py   # Pytest suite for Byzantine defense & slashing (11 tests)
 │   └── contracts/ConsensusTest.js    # Hardhat test suite for EVM contracts (5 tests)
 │
+├── run_phase5_pipeline.py            # Phase 5 Adversarial Stress & Slashing Pipeline
 ├── run_phase4_pipeline.py            # Phase 4 DRL Pipeline Execution Script
 ├── run_phase3_pipeline.py            # Phase 3 MCDM Prototype Execution Script
 ├── demo_phase1_phase2.py             # Phase 1 & 2 Math & Physics Demonstration

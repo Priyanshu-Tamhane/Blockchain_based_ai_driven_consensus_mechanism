@@ -68,6 +68,10 @@ class IoTNode:
             is_alive=self.is_alive
         )
 
+    def emit_telemetry(self, latency_jitter_ms: float = 0.0) -> TelemetryPacket:
+        """Alias for generate_telemetry."""
+        return self.generate_telemetry(latency_jitter_ms=latency_jitter_ms)
+
     def sign_block_proposal(self, block_hash: str) -> str:
         """
         Signs a block proposal hash using the node's private key via ECDSA secp256k1.
@@ -81,6 +85,10 @@ class IoTNode:
         signed_message = self.account.sign_message(message)
         self.blocks_signed += 1
         return signed_message.signature.hex()
+
+    def sign_hash(self, block_hash: str) -> str:
+        """Alias for sign_block_proposal."""
+        return self.sign_block_proposal(block_hash)
 
     def discharge_round_energy(
         self,

@@ -26,8 +26,10 @@ import matplotlib.pyplot as plt
 
 from simulator.fleet_simulator import IoTFleetSimulator
 from simulator.energy_model import HeinzelmanEnergyModel, HardwarePreset
+from simulator.adversarial import AdversarialInjector, AttackType
 from ai_engine.objective import MultiObjectiveOptimizer, ObjectiveWeights, SystemConstraints
 from ai_engine.drl_agent import DRLCommitteeSelector
+from ai_engine.defense_detector import ByzantineDefenseDetector, SecurityAlert
 
 
 st.set_page_config(
@@ -43,6 +45,9 @@ def init_or_reset_simulation():
     """Initializes or completely resets the fleet simulation state."""
     st.session_state.fleet_size = 14
     st.session_state.simulator = IoTFleetSimulator(node_count=st.session_state.fleet_size, seed=42)
+    st.session_state.adversary = AdversarialInjector()
+    st.session_state.defense = ByzantineDefenseDetector(hardware=HardwarePreset.ESP32)
+    st.session_state.alerts_history = []
     st.session_state.weights = ObjectiveWeights(w_security=0.35, w_energy=0.45, w_latency=0.20)
     st.session_state.constraints = SystemConstraints(
         min_battery_threshold=15.0,
@@ -107,12 +112,39 @@ drain_speed = st.sidebar.slider(
 )
 
 st.sidebar.subheader("🚨 Adversarial & Stress Injection")
-target_node_id = st.sidebar.selectbox("Select Node to Drain:", list(st.session_state.simulator.nodes.keys()))
-if st.sidebar.button(f"⚡ Force Drain {target_node_id} to 10% (Critical)"):
-    node = st.session_state.simulator.get_node(target_node_id)
-    if node:
-        node.force_drain_battery(10.0)
-        st.sidebar.warning(f"{target_node_id} battery dropped to 10.0% (< 15% threshold)!")
+target_node_id = st.sidebar.selectbox("Select Target Node:", list(st.session_state.simulator.nodes.keys()))
+
+col_att1, col_att2 = st.sidebar.columns(2)
+with col_att1:
+    if st.button("⚡ Drain to 10%", use_container_width=True):
+        node = st.session_state.simulator.get_node(target_node_id)
+        if node:
+            node.force_drain_battery(10.0)
+            st.sidebar.warning(f"{target_node_id} battery dropped to 10.0%!")
+with col_att2:
+    if st.button("🚨 Spoof 100%", use_container_width=True):
+        st.session_state.adversary.arm_attack(target_node_id, AttackType.TELEMETRY_SPOOFING)
+        st.sidebar.info(f"Armed Telemetry Spoofing on {target_node_id}")
+
+col_att3, col_att4 = st.sidebar.columns(2)
+with col_att3:
+    if st.button("⚔️ Double-Sign", use_container_width=True):
+        st.session_state.adversary.arm_attack(target_node_id, AttackType.BYZANTINE_EQUIVOCATION)
+        st.sidebar.error(f"Armed Double-Signing on {target_node_id}")
+with col_att4:
+    if st.button("👻 Sybil Vote", use_container_width=True):
+        st.session_state.adversary.arm_attack("Rogue", AttackType.SYBIL_INFILTRATION)
+        st.sidebar.error("Armed Rogue Sybil Vote Injection")
+
+col_att5, col_att6 = st.sidebar.columns(2)
+with col_att5:
+    if st.button("💤 Silent Drop", use_container_width=True):
+        st.session_state.adversary.arm_attack(target_node_id, AttackType.SILENT_DROPPING)
+        st.sidebar.warning(f"Armed Silent Dropping on {target_node_id}")
+with col_att6:
+    if st.button("🧹 Clear Attacks", use_container_width=True):
+        st.session_state.adversary.clear_all_attacks()
+        st.sidebar.success("Cleared all armed attacks.")
 
 def execute_epoch():
     st.session_state.current_epoch += 1
@@ -120,10 +152,17 @@ def execute_epoch():
     epoch = st.session_state.current_epoch
     block = st.session_state.current_block
 
-    # 1. Telemetry
-    telemetry = st.session_state.simulator.gather_telemetry()
+    # 1. Telemetry Ingestion & Adversarial Tampering
+    raw_telemetry = st.session_state.simulator.gather_telemetry()
+    tampered_telemetry = [
+        st.session_state.adversary.tamper_telemetry(st.session_state.simulator.nodes[t.node_id], t)
+        for t in raw_telemetry
+    ]
 
-    # 2. AI Election (with fatigue & dynamic rotation)
+    # 2. Physics-Informed Defense Sanitization
+    telemetry = st.session_state.defense.verify_telemetry_physics(epoch, tampered_telemetry)
+
+    # 3. AI Election (with fatigue & dynamic rotation)
     if "Deep RL" in engine_mode:
         directive = st.session_state.drl_selector.select_committee(epoch_id=epoch, telemetry=telemetry)
         engine_label = "DRL (PPO)"
@@ -131,12 +170,46 @@ def execute_epoch():
         directive = st.session_state.optimizer.select_committee(epoch_id=epoch, telemetry=telemetry)
         engine_label = "MCDM Heuristic"
     st.session_state.simulator.apply_committee_directive(directive)
+    st.session_state.defense.record_epoch_assignments(epoch, directive, telemetry)
 
-    # 3. Block Proposal & Signatures
+    # 4. Check for Byzantine Equivocation Attacks
+    for node_id, attack in list(st.session_state.adversary.active_attacks.items()):
+        if attack == AttackType.BYZANTINE_EQUIVOCATION:
+            node = st.session_state.simulator.get_node(node_id)
+            if node:
+                proof = st.session_state.adversary.generate_equivocation(node, epoch, block)
+                is_valid, alert = st.session_state.defense.verify_and_slash_equivocation(proof)
+                if is_valid:
+                    node.reputation = 0.0
+                    node.is_validator = False
+                    node.is_leader = False
+
+    # 5. Block Proposal & Signatures (with Silent Dropping simulation)
     raw_hash = hashlib.sha256(f"epoch_{epoch}_block_{block}".encode()).hexdigest()
-    signatures = st.session_state.simulator.collect_committee_signatures(directive, raw_hash)
+    valid_signatures = []
+    for addr in directive.members:
+        node = st.session_state.simulator.get_node_by_address(addr)
+        if not node:
+            continue
+        if node.address.lower() in st.session_state.defense.slashed_addresses:
+            continue
+        if st.session_state.adversary.get_attack_for_node(node.node_id) == AttackType.SILENT_DROPPING:
+            continue
+        sig = node.sign_hash(raw_hash)
+        valid_signatures.append(sig)
 
-    # 4. Energy Model Discharge (Heinzelman)
+    # 6. Sybil Detection
+    for attack in st.session_state.adversary.active_attacks.values():
+        if attack == AttackType.SYBIL_INFILTRATION:
+            sybil_vote = st.session_state.adversary.generate_sybil_vote(epoch, raw_hash)
+            registered_set = {n.address for n in st.session_state.simulator.nodes.values()}
+            st.session_state.defense.filter_sybil_and_invalid_votes(
+                epoch, [sybil_vote], registered_set, set(directive.members)
+            )
+
+    is_quorum_achieved = len(valid_signatures) >= directive.quorum_threshold
+
+    # 7. Energy Model Discharge (Heinzelman)
     model = HeinzelmanEnergyModel(hardware=HardwarePreset.ESP32)
     # Adaptive energy this round
     adaptive_round_j = 0.0
@@ -171,10 +244,11 @@ def execute_epoch():
         "Leader": leader_node.node_id if leader_node else "Unknown",
         "Committee Size (K)": directive.committee_size,
         "Quorum Threshold": directive.quorum_threshold,
-        "Signatures": len(signatures),
+        "Signatures": len(valid_signatures),
+        "Quorum Achieved": "YES" if is_quorum_achieved else "MISSED",
         "Avg Committee Batt %": round(directive.metadata.get("avg_battery_pct", 0.0), 1),
         "Utility Score": round(directive.metadata.get("utility", 0.0), 3),
-        "Status": "✅ COMMITTED"
+        "Status": "✅ COMMITTED" if is_quorum_achieved else "⚠️ FAILED"
     })
 
 col_btn1, col_btn2 = st.columns([1, 4])
@@ -210,7 +284,10 @@ for idx, (node_id, node) in enumerate(st.session_state.simulator.nodes.items()):
     col = cols[idx % 4]
     with col:
         # Determine visual badge
-        if not node.is_alive:
+        if node.address.lower() in st.session_state.defense.slashed_addresses:
+            badge = "⚔️ SLASHED & BLACKLISTED"
+            color = "#ff0055"
+        elif not node.is_alive:
             badge = "💀 DEAD"
             color = "#777777"
         elif node.is_leader:
@@ -270,3 +347,28 @@ with c_right:
         st.dataframe(pd.DataFrame(st.session_state.blocks_history), use_container_width=True, height=260)
     else:
         st.info("No blocks committed yet. Click 'Execute 1 Consensus Epoch' to start.")
+
+# Byzantine Defense & Slashing Audit Panel
+st.divider()
+st.subheader("🛡️ Byzantine Defense & Security Audit Log")
+
+sec_col1, sec_col2, sec_col3 = st.columns(3)
+sec_col1.metric("Security Incidents Intercepted", len(st.session_state.defense.alerts_log))
+sec_col2.metric("Slashed & Quarantined Nodes", len(st.session_state.defense.slashed_addresses))
+sec_col3.metric("Network Byzantine Integrity", "ENFORCED (f=1)" if len(st.session_state.defense.slashed_addresses) <= 1 else "AT RISK")
+
+if st.session_state.defense.alerts_log:
+    alerts_data = [
+        {
+            "Epoch": a.epoch_id,
+            "Target Node": a.node_id,
+            "Severity": a.severity,
+            "Attack Vector": a.attack_type.value,
+            "Detection Mechanics": a.description,
+            "Defense Action Taken": a.action_taken
+        }
+        for a in reversed(st.session_state.defense.alerts_log)
+    ]
+    st.dataframe(pd.DataFrame(alerts_data), use_container_width=True, height=220)
+else:
+    st.success("🟢 Network Secure: No adversarial incidents or anomalies detected. Fleet operating in honest mode.")

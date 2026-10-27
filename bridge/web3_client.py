@@ -138,3 +138,42 @@ class BlockchainClient:
 
     def get_latest_block_number(self) -> int:
         return self.consensus_contract.functions.latestBlockNumber().call()
+
+    def slash_node(self, node_address: str, reason: str) -> str:
+        """Executes on-chain slashing for a malicious node via NodeRegistry.sol."""
+        checksum_addr = Web3.to_checksum_address(node_address)
+        tx_hash = self.registry_contract.functions.slashNode(
+            checksum_addr,
+            reason
+        ).transact({"from": self.default_account})
+        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        return receipt.transactionHash.hex()
+
+    def update_reputation(self, node_address: str, new_reputation: int) -> str:
+        """Updates reputation score in NodeRegistry.sol (scaled by 1000)."""
+        checksum_addr = Web3.to_checksum_address(node_address)
+        tx_hash = self.registry_contract.functions.updateReputation(
+            checksum_addr,
+            new_reputation
+        ).transact({"from": self.default_account})
+        receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+        return receipt.transactionHash.hex()
+
+    def is_node_eligible(self, node_address: str) -> bool:
+        """Queries on-chain eligibility for committee selection."""
+        checksum_addr = Web3.to_checksum_address(node_address)
+        return self.registry_contract.functions.isNodeEligible(checksum_addr).call()
+
+    def get_node_info(self, node_address: str) -> Dict[str, Any]:
+        """Queries node metadata and slashing status from NodeRegistry.sol."""
+        checksum_addr = Web3.to_checksum_address(node_address)
+        info = self.registry_contract.functions.nodes(checksum_addr).call()
+        return {
+            "address": info[0],
+            "device_id": info[1],
+            "reputation_score": info[2] / 1000.0,
+            "status": info[3],  # 0=Inactive, 1=Active, 2=Suspended, 3=Slashed
+            "registered_at": info[4],
+            "blocks_validated": info[5],
+            "blocks_proposed": info[6]
+        }
