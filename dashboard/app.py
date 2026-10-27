@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 from simulator.fleet_simulator import IoTFleetSimulator
 from simulator.energy_model import HeinzelmanEnergyModel, HardwarePreset
 from ai_engine.objective import MultiObjectiveOptimizer, ObjectiveWeights, SystemConstraints
+from ai_engine.drl_agent import DRLCommitteeSelector
 
 
 st.set_page_config(
@@ -52,6 +53,12 @@ def init_or_reset_simulation():
         weights=st.session_state.weights,
         constraints=st.session_state.constraints
     )
+    model_weight_path = str(ROOT_DIR / "models" / "drl_consensus_agent.pt")
+    st.session_state.drl_selector = DRLCommitteeSelector(
+        model_path=model_weight_path if os.path.exists(model_weight_path) else None,
+        node_count=st.session_state.fleet_size,
+        constraints=st.session_state.constraints
+    )
     st.session_state.current_epoch = 0
     st.session_state.current_block = 0
     st.session_state.blocks_history = []
@@ -73,7 +80,15 @@ if st.sidebar.button("🔄 Reset Fleet & Ledger"):
     st.sidebar.success("Fleet, batteries & ledger reset successfully!")
     st.rerun()
 
-st.sidebar.subheader("Objective Function Weights")
+st.sidebar.subheader("🧠 Optimization Engine")
+engine_mode = st.sidebar.radio(
+    "Committee Selection Model",
+    ["Deep RL - PPO Agent (Phase 4)", "Heuristic MCDM (Phase 3)"],
+    index=0,
+    help="Switch between Deep Reinforcement Learning (PPO Actor-Critic) and Multi-Criteria Decision Making (MCDM) heuristic"
+)
+
+st.sidebar.subheader("Objective Function Weights (MCDM)")
 w_sec = st.sidebar.slider("Security (w1)", 0.0, 1.0, 0.35, 0.05)
 w_eng = st.sidebar.slider("Residual Battery (w2)", 0.0, 1.0, 0.45, 0.05)
 w_lat = st.sidebar.slider("Low Latency (w3)", 0.0, 1.0, 0.20, 0.05)
@@ -109,7 +124,12 @@ def execute_epoch():
     telemetry = st.session_state.simulator.gather_telemetry()
 
     # 2. AI Election (with fatigue & dynamic rotation)
-    directive = st.session_state.optimizer.select_committee(epoch_id=epoch, telemetry=telemetry)
+    if "Deep RL" in engine_mode:
+        directive = st.session_state.drl_selector.select_committee(epoch_id=epoch, telemetry=telemetry)
+        engine_label = "DRL (PPO)"
+    else:
+        directive = st.session_state.optimizer.select_committee(epoch_id=epoch, telemetry=telemetry)
+        engine_label = "MCDM Heuristic"
     st.session_state.simulator.apply_committee_directive(directive)
 
     # 3. Block Proposal & Signatures
@@ -147,6 +167,7 @@ def execute_epoch():
     st.session_state.blocks_history.insert(0, {
         "Epoch": epoch,
         "Block #": block,
+        "AI Engine": engine_label,
         "Leader": leader_node.node_id if leader_node else "Unknown",
         "Committee Size (K)": directive.committee_size,
         "Quorum Threshold": directive.quorum_threshold,

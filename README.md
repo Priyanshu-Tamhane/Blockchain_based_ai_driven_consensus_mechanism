@@ -55,7 +55,7 @@ Create and activate an isolated Python environment:
   ```
 
 ### Step 5: Install Python Dependencies
-Install `web3`, `eth-account`, `streamlit`, `scipy`, `numpy`, `matplotlib`, and `python-docx`:
+Install `torch`, `gymnasium`, `web3`, `eth-account`, `streamlit`, `scipy`, `numpy`, `matplotlib`, and `python-docx`:
 ```bash
 pip install -r requirements.txt
 ```
@@ -71,32 +71,46 @@ npx hardhat test
 ```
 *Expected output: `5 passing`.*
 
-### B. Run Mathematical & Radio Physics Tests (Pytest)
-Executes 9 automated unit tests verifying Heinzelman radio physics ($d^2 / d^4$), crossover distance ($87.7\text{m}$), and multi-objective utility functions:
+### B. Run Mathematical, Radio Physics & DRL Tests (Pytest)
+Executes 15 automated unit tests verifying Heinzelman radio physics ($d^2 / d^4$), crossover distance ($87.7\text{m}$), multi-objective utility functions, MDP gym environment, Actor-Critic networks, and DRL policy inference:
 ```bash
-python -m pytest tests/test_math_models.py -v
+python -m pytest tests/ -v
 ```
-*Expected output: `9 passed in 0.05s`.*
+*Expected output: `15 passed in ~10s`.*
 
-### C. Run the Headless Consensus Pipeline (Terminal Demo)
-Demonstrates the full end-to-end consensus flow across 6 epochs, real ECDSA block signing, dynamic leader fatigue load-balancing, and an automated stress-test:
+### C. Run the Phase 4 Deep RL Consensus Pipeline (Terminal Demo)
+Demonstrates the trained Actor-Critic (PPO) neural policy dynamically sizing committees, electing leaders based on neural logits, verifying ECDSA quorum, dissipating energy under the Heinzelman model, and reacting to adversarial battery crashes:
+```bash
+python run_phase4_pipeline.py
+```
+
+### D. (Optional) Re-Train the Deep RL (PPO) Agent
+To re-train the PPO agent from scratch through the Gymnasium environment:
+```bash
+python ai_engine/train_rl.py
+```
+*Outputs: `models/drl_consensus_agent.pt`.*
+
+### E. Run the Phase 3 Heuristic (MCDM) Pipeline
+Demonstrates the original multi-criteria utility heuristic and leadership fatigue load balancing:
 ```bash
 python run_phase3_pipeline.py
 ```
 
-### D. Launch the Real-Time Streamlit Visual Dashboard
+### F. Launch the Real-Time Streamlit Visual Dashboard
 Launches the interactive GUI for presentations and reviews:
 ```bash
 streamlit run dashboard/app.py
 ```
 *Open your browser at `http://localhost:8501`.*
 * **Features:**
+  * **AI Engine Switcher:** Seamlessly toggle in real time between **Deep RL - PPO Agent (Phase 4)** and **Heuristic MCDM (Phase 3)**.
   * **Real-time Fleet Grid:** Color-coded battery bars and role badges (`👑 ROUND LEADER`, `🛡️ VALIDATOR`, `💤 IDLE SLEEP`, `⚠️ QUARANTINED`).
   * **Dynamic Rotation:** Leadership dynamically rotates among healthy nodes; click **"⚡ Force Drain to 10%"** to watch the AI automatically quarantine a low-battery node and promote a new leader!
   * **Comparative Energy Graph:** Real-time plot comparing cumulative energy dissipation of **Adaptive Consensus** vs. **Static PBFT** (showing a 98.3% energy saving for resting nodes).
-  * **Live Blockchain Ledger:** Real-time log of committed blocks, state roots, and quorum signatures.
+  * **Live Blockchain Ledger:** Real-time log of committed blocks, state roots, and quorum signatures with active AI engine tags.
 
-### E. (Optional) Generate the Microsoft Word Report
+### G. (Optional) Generate the Microsoft Word Report
 To re-generate the full project documentation document (`.docx`):
 ```bash
 python generate_report_docx.py
@@ -155,20 +169,28 @@ AI_driven_consensus/
 │   └── fleet_simulator.py            # Multi-node mesh manager & telemetry streaming
 │
 ├── ai_engine/                        # TIER 2: Intelligent Committee Engine
-│   └── objective.py                  # Multi-Objective MCDM utility function & BFT constraints
+│   ├── objective.py                  # Multi-Objective MCDM utility function & BFT constraints
+│   ├── consensus_env.py              # Gymnasium MDP Environment for RL
+│   ├── drl_agent.py                  # Actor-Critic (PPO) Neural Network & Policy
+│   └── train_rl.py                   # PPO Agent Training Script
+│
+├── models/                           # Trained Neural Model Weights
+│   └── drl_consensus_agent.pt        # Serialized PyTorch Actor-Critic weights
 │
 ├── bridge/                           # Web3 Orchestration Layer
 │   ├── web3_client.py                # Python Web3.py wrapper for EVM JSON-RPC calls
 │   └── orchestrator.py               # End-to-end consensus round coordinator
 │
 ├── dashboard/                        # Visual Presentation & Demo UI
-│   └── app.py                        # Streamlit real-time interactive dashboard
+│   └── app.py                        # Streamlit real-time interactive dashboard (MCDM & DRL toggle)
 │
 ├── tests/                            # Automated Verification Suites
-│   ├── test_math_models.py           # Pytest suite for radio physics & AI math
-│   └── contracts/ConsensusTest.js    # Hardhat test suite for EVM contracts
+│   ├── test_math_models.py           # Pytest suite for radio physics & AI math (9 tests)
+│   ├── test_drl_agent.py             # Pytest suite for Gym MDP & DRL networks (6 tests)
+│   └── contracts/ConsensusTest.js    # Hardhat test suite for EVM contracts (5 tests)
 │
-├── run_phase3_pipeline.py            # CLI Prototype Demonstration Runner
+├── run_phase4_pipeline.py            # Phase 4 DRL Pipeline Execution Script
+├── run_phase3_pipeline.py            # Phase 3 MCDM Prototype Execution Script
 ├── demo_phase1_phase2.py             # Phase 1 & 2 Math & Physics Demonstration
 ├── generate_report_docx.py           # Script to generate Word report (.docx)
 ├── hardhat.config.js                 # Hardhat EVM configuration (Cancun)

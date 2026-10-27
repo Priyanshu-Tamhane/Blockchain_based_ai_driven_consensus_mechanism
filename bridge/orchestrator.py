@@ -25,10 +25,11 @@ class ConsensusOrchestrator:
         node_count: int = 12,
         hardware: HardwarePreset = HardwarePreset.ESP32,
         use_blockchain: bool = True,
-        rpc_url: str = "http://127.0.0.1:8545"
+        rpc_url: str = "http://127.0.0.1:8545",
+        selector: Optional[Any] = None
     ):
         self.simulator = IoTFleetSimulator(node_count=node_count, default_hardware=hardware)
-        self.optimizer = MultiObjectiveOptimizer(
+        self.selector = selector or MultiObjectiveOptimizer(
             weights=ObjectiveWeights(w_security=0.35, w_energy=0.45, w_latency=0.20),
             constraints=SystemConstraints(
                 min_battery_threshold=15.0,
@@ -36,6 +37,7 @@ class ConsensusOrchestrator:
                 byzantine_tolerance_f=1
             )
         )
+        self.optimizer = self.selector  # Backwards compatibility alias
         self.use_blockchain = use_blockchain
         self.blockchain: Optional[BlockchainClient] = None
         self.current_epoch = 0
@@ -68,8 +70,8 @@ class ConsensusOrchestrator:
         # 1. Telemetry Ingestion
         telemetry = self.simulator.gather_telemetry()
 
-        # 2. AI Multi-Objective Committee Selection
-        directive = self.optimizer.select_committee(epoch_id=epoch_id, telemetry=telemetry)
+        # 2. AI Committee Selection (MCDM Heuristic or DRL Policy Network)
+        directive = self.selector.select_committee(epoch_id=epoch_id, telemetry=telemetry)
         self.simulator.apply_committee_directive(directive)
 
         schedule_tx = None

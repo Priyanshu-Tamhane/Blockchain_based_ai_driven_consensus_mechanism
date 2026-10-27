@@ -19,10 +19,15 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+build/
+dist/
+*.egg-info/
 
 .pytest_cache/
 .coverage
 htmlcov/
+.deepeval/
+deepeval_test_results/
 
 # Virtual Environments
 venv/
@@ -32,6 +37,24 @@ ENV/
 
 # Jupyter Notebooks checkpoint
 .ipynb_checkpoints/
+
+# ==========================================
+# PyTorch, Matplotlib & Machine Learning Caches
+# ==========================================
+.torch/
+.triton/
+.unsloth/
+.matplotlib/
+torchinductor/
+tmp/
+temp/
+*.tmp
+
+# Checkpoints & intermediate training weights (allow production model)
+models/*.tmp
+models/*_checkpoint_*.pt
+models/*_interim_*.pt
+models/checkpoints/
 
 # ==========================================
 # Environment Variables, Secrets & Logs
@@ -55,4 +78,7 @@ yarn-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+ehthumbs.db
 desktop.ini
+*.swp
+*~

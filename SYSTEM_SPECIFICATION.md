@@ -243,11 +243,19 @@ AI_driven_consensus/
 * Implemented `MultiObjectiveOptimizer` with consecutive-term leadership fatigue penalty.
 * Implemented end-to-end Python `Web3` orchestrator and interactive `Streamlit` dashboard.
 
-### Phase 4: Machine Learning Advancement (Post-Midterm Target)
-* Upgrade from MCDM heuristic to **Deep Reinforcement Learning (DQN / PPO)**:
-  * **State Space ($S_t$):** Fleet residual energy vector, moving average latency, packet drop rates, block finality intervals.
-  * **Action Space ($A_t$):** Committee sizing $K_t \in [K_{min}, K_{max}]$ and node selection mask.
-  * **Reward Function ($R_t$):** Positive reward for low finality latency and consensus success; heavy penalty for selecting dead nodes or causing high battery variance.
+### Phase 4: Machine Learning Advancement — Deep Reinforcement Learning (Completed)
+* Formalized the consensus optimization as a **Markov Decision Process (MDP)** in Gymnasium environment (`ai_engine/consensus_env.py`):
+  * **Observation State Space ($S_t \in \mathbb{R}^{4N + 2}$):** For each of the $N$ nodes: normalized residual battery, normalized latency, reputation score, and participation/leadership fatigue, augmented with global fleet viability ratio and normalized epoch counter.
+  * **Continuous Action Space ($A_t \in \mathbb{R}^{N + 1}$):** Single committee sizing logit $\alpha_{size}$ decoded via sigmoid to $K_t \in [3f+1, \min(N_{viable}, K_{max})]$, plus $N$ continuous priority logits for ranking candidates.
+  * **Composite Multi-Objective Reward Function ($R_t$):**
+    $$R_t = +3.0 \cdot \mathbf{1}_{\text{consensus}} + 1.5 \cdot \overline{E}_{comm} - 1.0 \cdot \sigma^2(E) - 1.2 \cdot \overline{\mathcal{L}}_{comm} - 2.0 \cdot \left(\frac{K_t - K_{min}}{K_{max} - K_{min}}\right) - \mathcal{P}_{BFT}$$
+    Balances fast quorum settlement with battery variance minimization and packet minimization, with heavy penalties ($\mathcal{P}_{BFT} = -15.0$) if Byzantine invariants fail.
+* Implemented **Actor-Critic Neural Policy with PPO** (`ai_engine/drl_agent.py`):
+  * Actor-Critic architecture with dual MLP backbones (128-dim hidden layers, LeakyReLU activations, diagonal Gaussian log-std parameter).
+  * Clipped surrogate objective ($L^{CLIP}(\theta)$) with Generalized Advantage Estimation ($\text{GAE}(\gamma=0.99, \lambda=0.95)$).
+  * Saved trained neural weights to `models/drl_consensus_agent.pt`.
+* Fully integrated `DRLCommitteeSelector` into both the interactive Streamlit dashboard (`dashboard/app.py`) and headless pipeline (`run_phase4_pipeline.py`).
+* Comprehensive test suite: 15/15 unit tests passing across math, physics, and neural agents.
 
 ### Phase 5: Adversarial Stress Testing & Byzantine Defense (Post-Midterm Target)
 * Implement automated attack injection suites:
@@ -277,15 +285,21 @@ npx hardhat compile
 # 3. Run automated Hardhat smart contract tests (5 passing)
 npx hardhat test
 
-# 4. Install Python dependencies
+# 4. Install Python dependencies (PyTorch, Gymnasium, Web3, Streamlit, etc.)
 pip install -r requirements.txt
 
-# 5. Run automated mathematical & physics tests (9 passing)
-python -m pytest tests/test_math_models.py -v
+# 5. Run all automated unit tests: math models, physics & DRL agent (15 passing)
+python -m pytest tests/ -v
 
-# 6. Execute the headless 6-round prototype consensus pipeline
+# 6. Train the Deep Reinforcement Learning (PPO) agent
+python ai_engine/train_rl.py
+
+# 7. Execute the Phase 3 (MCDM) headless consensus pipeline
 python run_phase3_pipeline.py
 
-# 7. Launch the real-time interactive Streamlit dashboard
+# 8. Execute the Phase 4 (Deep RL Actor-Critic) headless pipeline
+python run_phase4_pipeline.py
+
+# 9. Launch the interactive Streamlit dashboard (supports MCDM & DRL toggle)
 streamlit run dashboard/app.py
 ```
