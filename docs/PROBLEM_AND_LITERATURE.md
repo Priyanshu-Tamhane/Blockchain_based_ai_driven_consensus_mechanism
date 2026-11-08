@@ -1,7 +1,7 @@
-# Phase 1: Problem Definition & Comprehensive Literature Review
+# Problem Definition & Comprehensive Literature Review
 
 ## 1. Executive Summary
-This document formalizes **Phase 1** of the *AI-Based Adaptive Consensus Mechanism for Energy-Efficient Blockchain IoT Networks*. It articulates the fundamental tension between distributed consensus guarantees and physical Internet of Things (IoT) hardware constraints, surveys existing consensus paradigms, and formalizes the research gap that motivates this project.
+This document formalizes the theoretical foundations of the *AI-Based Adaptive Consensus Mechanism for Energy-Efficient Blockchain IoT Networks*. It articulates the fundamental tension between distributed consensus guarantees and physical Internet of Things (IoT) hardware constraints, surveys existing consensus paradigms, and formalizes the research gap that motivates this project.
 
 ---
 

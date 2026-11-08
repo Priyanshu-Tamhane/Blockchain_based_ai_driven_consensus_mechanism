@@ -1,5 +1,5 @@
 """
-Unit test suite verifying Phase 4 Deep Reinforcement Learning components:
+Unit test suite verifying Deep Reinforcement Learning components:
 IoTConsensusEnv MDP dynamics, ActorCriticNetwork forward pass, and DRLCommitteeSelector inference.
 """
 import os

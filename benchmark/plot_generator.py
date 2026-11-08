@@ -1,5 +1,5 @@
 """
-Plot Generator and Export Utility for Phase 6 Empirical Benchmarking.
+Plot Generator and Export Utility for Empirical Benchmarking.
 Produces publication-quality comparative visualization charts:
   1. battery_decay_curves.png (Uniform load balancing vs single-node burnout)
   2. cumulative_energy_comparison.png (Fleet energy trajectory)

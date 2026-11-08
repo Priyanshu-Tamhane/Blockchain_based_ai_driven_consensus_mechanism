@@ -1,5 +1,5 @@
 """
-Empirical Benchmarking Engine for Phase 6.
+Empirical Benchmarking Engine.
 Compares:
   1. Classical Static PBFT Baseline (All N nodes validate every round, O(N^2) messages)
   2. Fixed Stake-Based PoS Baseline (Fixed validator subset, no energy awareness)

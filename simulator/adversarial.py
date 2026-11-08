@@ -1,5 +1,5 @@
 """
-Adversarial Attack Simulation Engine for Phase 5.
+Adversarial Attack Simulation Engine.
 Simulates canonical Byzantine and IoT-specific attack vectors:
   1. Telemetry Spoofing (Free-rider attack: fake 100% battery / low latency)
   2. Byzantine Equivocation (Double-signing conflicting block proposals)

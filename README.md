@@ -78,56 +78,53 @@ python -m pytest tests/ -v
 ```
 *Expected output: `29 passed in ~13s`.*
 
-### C. Run the Phase 6 Empirical Benchmarking & Comparative Pipeline
+### C. Run the Master Unified Pipeline
+Executes the complete unified workflow: runs the consensus simulation with live attack defense, executes empirical benchmarking against PBFT and PoS baselines, generates publication charts, and builds the Word dissertation report:
+```bash
+python main.py
+```
+
+### D. Run the Interactive Consensus & Attack Defense Demo
+Demonstrates dynamic committee selection (PPO or MCDM), Heinzelman radio energy calculations, ECDSA vote collection, and active defense against 4 attack vectors (Telemetry Spoofing, Double-Signing Equivocation, Sybil Infiltration, and Validator Silent Dropping):
+```bash
+python main.py --mode demo
+```
+*Optional flags:*
+* `--optimizer drl` (default) or `--optimizer mcdm`
+* `--rounds 6` (customize number of epochs)
+
+### E. Run Empirical Benchmarking & Comparative Evaluation
 Executes a 100-round head-to-head evaluation against Classical Static PBFT and Fixed PoS under identical radio physics, generating publication-ready charts in `benchmark_results/`:
 ```bash
-python run_phase6_pipeline.py
+python main.py --mode benchmark
 ```
 *Outputs: `battery_decay_curves.png`, `cumulative_energy_comparison.png`, `network_survival_curves.png`, `message_complexity_scaling.png`, and `benchmark_metrics_summary.json`.*
 
-### D. Run the Phase 5 Adversarial Stress Testing & Byzantine Slashing Pipeline
-Demonstrates active defense under 4 attack vectors (Telemetry Spoofing, Double-Signing Equivocation, Sybil Infiltration, and Validator Silent Dropping), with real-time anomaly detection and on-chain slashing:
-```bash
-python run_phase5_pipeline.py
-```
-
-### E. Run the Phase 4 Deep RL Consensus Pipeline (Terminal Demo)
-Demonstrates the trained Actor-Critic (PPO) neural policy dynamically sizing committees, electing leaders based on neural logits, verifying ECDSA quorum, and calculating Heinzelman energy savings:
-```bash
-python run_phase4_pipeline.py
-```
-
 ### F. (Optional) Re-Train the Deep RL (PPO) Agent
-To re-train the PPO agent from scratch through the Gymnasium environment:
+To train the Actor-Critic policy network from scratch through the Gymnasium MDP environment:
 ```bash
-python ai_engine/train_rl.py
+python main.py --mode train
 ```
 *Outputs: `models/drl_consensus_agent.pt`.*
 
-### G. Run the Phase 3 Heuristic (MCDM) Pipeline
-Demonstrates the original multi-criteria utility heuristic and leadership fatigue load balancing:
-```bash
-python run_phase3_pipeline.py
-```
-
-### H. Launch the Real-Time Streamlit Visual Dashboard
+### G. Launch the Real-Time Streamlit Visual Dashboard
 Launches the interactive GUI for presentations and reviews:
 ```bash
 streamlit run dashboard/app.py
 ```
 *Open your browser at `http://localhost:8501`.*
 * **Features:**
-  * **AI Engine Switcher:** Seamlessly toggle in real time between **Deep RL - PPO Agent (Phase 4)** and **Heuristic MCDM (Phase 3)**.
+  * **AI Engine Switcher:** Seamlessly toggle in real time between **Deep Reinforcement Learning (PPO Agent)** and **Heuristic MCDM Optimizer**.
   * **Adversarial Attack Suite:** Live triggers for Telemetry Spoofing (100% fake battery), Byzantine Equivocation (Double-Signing), Sybil Vote Injection, and Validator Silent Dropping.
   * **Byzantine Defense & Slashing Audit Log:** Real-time table logging security incidents, anomaly detections, and on-chain slashed nodes.
   * **Real-time Fleet Grid:** Color-coded battery bars and role badges (`👑 ROUND LEADER`, `🛡️ VALIDATOR`, `💤 IDLE SLEEP`, `⚠️ QUARANTINED`, `⚔️ SLASHED & BLACKLISTED`).
   * **Comparative Energy Graph:** Real-time plot comparing cumulative energy dissipation of **Adaptive Consensus** vs. **Static PBFT** (showing a 98.3% energy saving for resting nodes).
   * **Live Blockchain Ledger:** Real-time log of committed blocks, state roots, and quorum signatures with active AI engine tags.
 
-### I. Generate the Publication Word Dissertation Report
-Generates the complete technical report with embedded publication figures, empirical tables, and viva Q&A:
+### H. Generate the Publication Word Dissertation Report
+Generates the complete technical report with embedded publication figures, empirical tables, and viva defense Q&A:
 ```bash
-python generate_report_docx.py
+python main.py --mode report
 ```
 *Outputs: `AI_Driven_Consensus_Project_Report.docx` (1.15 MB).*
 
@@ -218,11 +215,7 @@ AI_driven_consensus/
 │   ├── test_benchmarks.py            # Pytest suite for benchmarking metrics (3 tests)
 │   └── contracts/ConsensusTest.js    # Hardhat test suite for EVM contracts (5 tests)
 │
-├── run_phase6_pipeline.py            # Phase 6 Empirical Benchmarking Execution Script
-├── run_phase5_pipeline.py            # Phase 5 Adversarial Stress & Slashing Pipeline
-├── run_phase4_pipeline.py            # Phase 4 DRL Pipeline Execution Script
-├── run_phase3_pipeline.py            # Phase 3 MCDM Prototype Execution Script
-├── demo_phase1_phase2.py             # Phase 1 & 2 Math & Physics Demonstration
+├── main.py                           # Master CLI Unified Pipeline (all, demo, benchmark, train, report)
 ├── generate_report_docx.py           # Script to generate Word report (.docx)
 ├── hardhat.config.js                 # Hardhat EVM configuration (Cancun)
 ├── package.json                      # Node.js dependencies

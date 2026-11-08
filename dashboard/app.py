@@ -1,6 +1,6 @@
 """
 Real-Time Interactive Dashboard for Adaptive IoT Blockchain Consensus.
-Mid-Semester Review Visual Presentation Interface.
+Interactive Visual Presentation Interface.
 Displays:
   - Fleet Telemetry & Battery Gauges
   - Dynamic Committee Selection & Rotation Highlighting
@@ -88,18 +88,23 @@ if st.sidebar.button("🔄 Reset Fleet & Ledger"):
 st.sidebar.subheader("🧠 Optimization Engine")
 engine_mode = st.sidebar.radio(
     "Committee Selection Model",
-    ["Deep RL - PPO Agent (Phase 4)", "Heuristic MCDM (Phase 3)"],
+    ["Deep Reinforcement Learning (PPO Agent)", "Heuristic MCDM Optimizer"],
     index=0,
     help="Switch between Deep Reinforcement Learning (PPO Actor-Critic) and Multi-Criteria Decision Making (MCDM) heuristic"
 )
 
-st.sidebar.subheader("Objective Function Weights (MCDM)")
-w_sec = st.sidebar.slider("Security (w1)", 0.0, 1.0, 0.35, 0.05)
-w_eng = st.sidebar.slider("Residual Battery (w2)", 0.0, 1.0, 0.45, 0.05)
-w_lat = st.sidebar.slider("Low Latency (w3)", 0.0, 1.0, 0.20, 0.05)
+is_drl = "Reinforcement" in engine_mode or "PPO" in engine_mode
 
-st.session_state.weights = ObjectiveWeights(w_security=w_sec, w_energy=w_eng, w_latency=w_lat)
-st.session_state.optimizer.weights = st.session_state.weights
+if is_drl:
+    st.sidebar.success("⚡ Neural Engine Active: Actor-Critic PPO Policy Network (`models/drl_consensus_agent.pt`)")
+else:
+    st.sidebar.info("📐 Heuristic Active: Multi-Criteria Decision-Making (MCDM)")
+    st.sidebar.markdown("**Objective Function Weights (MCDM)**")
+    w_sec = st.sidebar.slider("Security (w1)", 0.0, 1.0, 0.35, 0.05)
+    w_eng = st.sidebar.slider("Residual Battery (w2)", 0.0, 1.0, 0.45, 0.05)
+    w_lat = st.sidebar.slider("Low Latency (w3)", 0.0, 1.0, 0.20, 0.05)
+    st.session_state.weights = ObjectiveWeights(w_security=w_sec, w_energy=w_eng, w_latency=w_lat)
+    st.session_state.optimizer.weights = st.session_state.weights
 
 st.sidebar.subheader("🔋 Simulation Physics & Drain Rate")
 drain_speed = st.sidebar.slider(
@@ -163,12 +168,12 @@ def execute_epoch():
     telemetry = st.session_state.defense.verify_telemetry_physics(epoch, tampered_telemetry)
 
     # 3. AI Election (with fatigue & dynamic rotation)
-    if "Deep RL" in engine_mode:
+    if is_drl:
         directive = st.session_state.drl_selector.select_committee(epoch_id=epoch, telemetry=telemetry)
-        engine_label = "DRL (PPO)"
+        engine_label = "Deep RL (PPO Agent)"
     else:
         directive = st.session_state.optimizer.select_committee(epoch_id=epoch, telemetry=telemetry)
-        engine_label = "MCDM Heuristic"
+        engine_label = "Heuristic MCDM Optimizer"
     st.session_state.simulator.apply_committee_directive(directive)
     st.session_state.defense.record_epoch_assignments(epoch, directive, telemetry)
 

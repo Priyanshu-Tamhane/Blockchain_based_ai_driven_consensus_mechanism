@@ -1,5 +1,5 @@
 """
-Byzantine Defense and Anomaly Detection Layer for Phase 5.
+Byzantine Defense and Anomaly Detection Layer.
 Combines:
   1. Physics-Informed Telemetry Consistency Checker (Heinzelman radio dissipation)
   2. Cryptographic Equivocation / Double-Signing Verifier

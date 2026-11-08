@@ -1,5 +1,5 @@
 """
-Unit Tests for Phase 6 Empirical Benchmarking Suite.
+Unit Tests for Empirical Benchmarking Suite.
 Verifies:
   1. Multi-protocol comparative simulation execution (PBFT, PoS, Adaptive)
   2. Metrics tracking (FND, Cumulative Joules, Message count)

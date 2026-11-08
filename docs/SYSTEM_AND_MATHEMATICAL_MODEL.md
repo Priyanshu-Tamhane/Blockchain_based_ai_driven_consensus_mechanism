@@ -1,4 +1,4 @@
-# Phase 2: System Modeling & Mathematical Formulations
+# System Modeling & Mathematical Formulations
 
 ## 1. System Architecture Overview
 

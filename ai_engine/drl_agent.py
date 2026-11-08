@@ -257,10 +257,12 @@ class DRLCommitteeSelector:
             self.has_weights = False
 
         self.rounds_led_map: Dict[str, int] = {}
+        self.leadership_history: Dict[str, int] = {}
 
     def reset(self):
         """Resets leadership fatigue and tracking history."""
         self.rounds_led_map.clear()
+        self.leadership_history.clear()
 
     def _telemetry_to_observation(self, telemetry: List[TelemetryPacket], epoch_id: int) -> np.ndarray:
         obs = []
@@ -311,16 +313,27 @@ class DRLCommitteeSelector:
         target_k = int(round(self.min_k + norm_size * (allowed_max_k - self.min_k)))
         target_k = max(self.min_k, min(allowed_max_k, target_k))
 
-        # 4. Rank candidates by agent's output logits
+        # 4. Rank candidates by agent's output logits, applying dynamic leadership fatigue
         node_scores = []
         for f_idx, node in zip(feasible_indices, feasible_nodes):
             priority_score = float(action[1 + f_idx])
+
+            # Leadership Workload & Fatigue Penalty:
+            # Prevents a single high-score node from monopolizing leadership every round,
+            # ensuring active load-balancing and rotating leadership among healthy peers.
+            if node.address in self.leadership_history:
+                epochs_since_lead = epoch_id - self.leadership_history[node.address]
+                if epochs_since_lead <= 3:
+                    fatigue = 0.90 - (0.25 * (epochs_since_lead - 1))
+                    priority_score -= max(0.10, fatigue)
+
             node_scores.append((node, priority_score))
 
         node_scores.sort(key=lambda x: x[1], reverse=True)
         selected_nodes = [node for node, score in node_scores[:target_k]]
         leader = selected_nodes[0]
 
+        self.leadership_history[leader.address] = epoch_id
         self.rounds_led_map[leader.address] = self.rounds_led_map.get(leader.address, 0) + 1
         quorum = math.floor((2.0 / 3.0) * target_k) + 1
         avg_battery = sum(n.battery_percentage for n in selected_nodes) / len(selected_nodes)

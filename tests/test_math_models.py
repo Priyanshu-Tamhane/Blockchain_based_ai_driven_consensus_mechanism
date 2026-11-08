@@ -1,5 +1,5 @@
 """
-Unit test suite verifying Phase 1 & 2 mathematical models:
+Unit test suite verifying mathematical models:
 Heinzelman energy physics, BFT safety bounds, and multi-objective utility scoring.
 """
 import pytest

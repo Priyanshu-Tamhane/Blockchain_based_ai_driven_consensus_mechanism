@@ -21,7 +21,7 @@ def train_drl_agent(
     save_path: str = "models/drl_consensus_agent.pt"
 ):
     print("=" * 80)
-    print("      PHASE 4: TRAINING DEEP REINFORCEMENT LEARNING (PPO) CONSENSUS AGENT")
+    print("      TRAINING DEEP REINFORCEMENT LEARNING (PPO) CONSENSUS AGENT")
     print("=" * 80)
 
     env = IoTConsensusEnv(node_count=14, max_epochs=steps_per_episode, drain_multiplier=1200.0)

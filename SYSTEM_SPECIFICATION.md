@@ -190,16 +190,51 @@ AI_driven_consensus/
 │   └── app.py                        # Streamlit interactive dashboard with live fleet & ledger
 │
 ├── docs/                             # Academic & Research Documentation
-│   ├── PHASE_1_PROBLEM_AND_LITERATURE.md # Hardware constraints & consensus critique
-│   └── PHASE_2_SYSTEM_AND_MATHEMATICAL_MODEL.md # Radio physics & BFT formulations
+│   ├── PROBLEM_AND_LITERATURE.md     # Hardware constraints & consensus critique
+│   └── SYSTEM_AND_MATHEMATICAL_MODEL.md # Radio physics & BFT formulations
 │
 ├── tests/                            # Automated Verification Suites
 │   ├── test_math_models.py           # Pytest suite (9 tests) for radio physics & AI math
 │   └── contracts/ConsensusTest.js    # Hardhat suite (5 tests) for EVM contracts
 │
-├── run_phase3_pipeline.py            # Headless CLI Demonstration Pipeline Runner
-├── demo_phase1_phase2.py             # Phase 1 & 2 Verification Demo Runner
-├── generate_report_docx.py           # Script to generate Word Report (.docx)
+├── main.py                           # Master CLI Unified Pipeline (all, demo, benchmark, train, report)
+├── ai_engine/                        # Artificial Intelligence & Multi-Objective Layer
+│   ├── objective.py                  # Analytical Multi-Criteria Decision-Making (MCDM)
+│   ├── drl_agent.py                  # PPO Actor-Critic Neural Policy Network
+│   ├── consensus_env.py              # OpenAI Gymnasium IoT Consensus Environment (MDP)
+│   ├── train_rl.py                   # PPO Training Pipeline
+│   └── defense_detector.py           # Physics-informed Anomaly & Equivocation Slashing Detector
+│
+├── benchmark/                        # Empirical Research & Evaluation Suite
+│   ├── benchmark_engine.py           # Multi-protocol simulator (Adaptive vs PBFT vs PoS)
+│   └── plot_generator.py             # Publication chart generator and CSV/JSON exporter
+│
+├── contracts/                        # Smart Contracts (EVM Cancun / Solidity 0.8.24)
+│   ├── NodeRegistry.sol              # Staking, node identities, reputation, and on-chain slashing
+│   └── AdaptiveConsensus.sol         # Quorum threshold verification & epoch commitment
+│
+├── simulator/                        # IoT Fleet Physics & Adversarial Simulator
+│   ├── energy_model.py               # Heinzelman First-Order Radio Model implementation
+│   ├── iot_node.py                   # Virtual ESP32 node with ECDSA secp256k1 keypairs
+│   ├── fleet_simulator.py            # Heterogeneous mesh network manager & topology
+│   ├── adversarial.py                # Attack injection (spoofing, double-signing, Sybil, DoS)
+│   └── models.py                     # Strongly-typed Dataclasses & EVM types
+│
+├── dashboard/                        # Presentation & Demonstration GUI
+│   └── app.py                        # Streamlit interactive dashboard with live fleet & ledger
+│
+├── docs/                             # Academic & Research Documentation
+│   ├── PROBLEM_AND_LITERATURE.md     # Hardware constraints & consensus critique
+│   └── SYSTEM_AND_MATHEMATICAL_MODEL.md # Radio physics & BFT formulations
+│
+├── tests/                            # Automated Verification Suites
+│   ├── test_math_models.py           # Pytest suite for radio physics & utility math
+│   ├── test_drl_agent.py             # Pytest suite for Gymnasium MDP & PPO network
+│   ├── test_adversarial_defense.py   # Pytest suite for attack vectors & slashing
+│   ├── test_benchmarks.py            # Pytest suite for comparative simulations
+│   └── contracts/ConsensusTest.js    # Hardhat suite (5 tests) for EVM contracts
+│
+├── generate_report_docx.py           # Dissertation/Report Generator (.docx)
 ├── hardhat.config.js                 # Hardhat configuration (Solidity 0.8.24, Cancun EVM)
 ├── package.json                      # Node.js dependencies
 └── requirements.txt                  # Python dependencies
@@ -220,76 +255,59 @@ AI_driven_consensus/
 
 ---
 
-## 8. Multi-Phase Project Roadmap (Begin to End)
+## 8. Core Subsystems & Implementation Verification
 
-```
-   PHASE 1 & 2               PHASE 3                  PHASE 4                  PHASE 5                  PHASE 6
- [Formulation]          [Working Prototype]      [AI Sophistication]     [Adversarial Testing]    [Final Benchmarking]
-  Mathematical            End-to-End Loop:        Deep Reinforcement       Byzantine Injection:     Comparative Studies,
-  energy models &         Telemetry -> MCDM       Learning (DQN/PPO)       Battery Spoofing &       FND, Gas Tuning &
-  Byzantine bounds        Heuristic -> EVM        Agent Optimization       Slashing Defense         Final Thesis Defense
-        │                        │                        │                        │                        │
-  [ COMPLETED ]            [ COMPLETED ]          [ POST-MID-TERM ]        [ POST-MID-TERM ]        [ FINAL DEFENSE ]
-```
+The system integrates five interdependent engineering subsystems into one unified, end-to-end framework:
 
-### Phase 1 & 2: Mathematical & Theoretical Foundations (Completed)
-* Formalized Heinzelman radio physics ($d^2/d^4$), CPU cryptographic dissipation, and multi-objective global utility function.
+### 8.1 Mathematical & Radio Physics Foundation
+* Formalized Heinzelman radio physics ($d^2/d^4$ free-space/multi-path propagation), CPU cryptographic dissipation, and multi-objective global utility function.
 * Proved BFT safety bound $K_t \ge 3f + 1$ and quorum rule $\lfloor 2/3 K_t \rfloor + 1$.
-* Verified via 9 unit tests in `tests/test_math_models.py`.
+* Verified via unit tests in `tests/test_math_models.py`.
 
-### Phase 3: Working Prototype & Proof-of-Concept (Completed)
-* Implemented `NodeRegistry.sol` and `AdaptiveConsensus.sol` on local Hardhat Cancun EVM (5/5 tests passing).
-* Implemented virtual ESP32 IoT fleet with ECDSA `secp256k1` signing and Heinzelman discharge.
-* Implemented `MultiObjectiveOptimizer` with consecutive-term leadership fatigue penalty.
-* Implemented end-to-end Python `Web3` orchestrator and interactive `Streamlit` dashboard.
+### 8.2 Smart Contract Settlement Layer (EVM)
+* Implemented `NodeRegistry.sol` and `AdaptiveConsensus.sol` compiled targeting Solidity 0.8.24 and the Cancun EVM.
+* Enforces on-chain cryptographic quorum verification ($\ge \lfloor 2/3 K \rfloor + 1$), node staking, registration whitelisting, and automated slashing.
+* Verified via 5 automated Hardhat test suites (`tests/contracts/ConsensusTest.js`).
 
-### Phase 4: Machine Learning Advancement — Deep Reinforcement Learning (Completed)
-* Formalized the consensus optimization as a **Markov Decision Process (MDP)** in Gymnasium environment (`ai_engine/consensus_env.py`):
+### 8.3 Intelligent Optimization Engine (MCDM & Deep Reinforcement Learning)
+* **Heuristic MCDM Optimizer (`ai_engine/objective.py`):** Analytical Pareto ranking balancing residual battery, link latency, reputation, and consecutive-term leadership fatigue penalties.
+* **Deep Reinforcement Learning Agent (`ai_engine/drl_agent.py`, `ai_engine/consensus_env.py`):**
+  * Formalized consensus optimization as a **Markov Decision Process (MDP)** in Gymnasium environment (`IoTConsensusEnv`).
   * **Observation State Space ($S_t \in \mathbb{R}^{4N + 2}$):** For each of the $N$ nodes: normalized residual battery, normalized latency, reputation score, and participation/leadership fatigue, augmented with global fleet viability ratio and normalized epoch counter.
   * **Continuous Action Space ($A_t \in \mathbb{R}^{N + 1}$):** Single committee sizing logit $\alpha_{size}$ decoded via sigmoid to $K_t \in [3f+1, \min(N_{viable}, K_{max})]$, plus $N$ continuous priority logits for ranking candidates.
   * **Composite Multi-Objective Reward Function ($R_t$):**
     $$R_t = +3.0 \cdot \mathbf{1}_{\text{consensus}} + 1.5 \cdot \overline{E}_{comm} - 1.0 \cdot \sigma^2(E) - 1.2 \cdot \overline{\mathcal{L}}_{comm} - 2.0 \cdot \left(\frac{K_t - K_{min}}{K_{max} - K_{min}}\right) - \mathcal{P}_{BFT}$$
-    Balances fast quorum settlement with battery variance minimization and packet minimization, with heavy penalties ($\mathcal{P}_{BFT} = -15.0$) if Byzantine invariants fail.
-* Implemented **Actor-Critic Neural Policy with PPO** (`ai_engine/drl_agent.py`):
-  * Actor-Critic architecture with dual MLP backbones (128-dim hidden layers, LeakyReLU activations, diagonal Gaussian log-std parameter).
-  * Clipped surrogate objective ($L^{CLIP}(\theta)$) with Generalized Advantage Estimation ($\text{GAE}(\gamma=0.99, \lambda=0.95)$).
-  * Saved trained neural weights to `models/drl_consensus_agent.pt`.
-* Fully integrated `DRLCommitteeSelector` into both the interactive Streamlit dashboard (`dashboard/app.py`) and headless pipeline (`run_phase4_pipeline.py`).
-* Comprehensive test suite: 15/15 unit tests passing across math, physics, and neural agents.
+  * **Actor-Critic Neural Policy with PPO:** Dual MLP backbones trained with clipped surrogate objective and Generalized Advantage Estimation (GAE). Pre-trained weights saved to `models/drl_consensus_agent.pt`.
+* Fully integrated `DRLCommitteeSelector` into both the interactive Streamlit dashboard (`dashboard/app.py`) and the unified pipeline (`main.py`).
+* Verified via unit tests in `tests/test_drl_agent.py`.
 
-### Phase 5: Adversarial Stress Testing & Byzantine Defense (Completed)
-* Implemented modular attack injection suite (`simulator/adversarial.py`):
-  * **Telemetry Spoofing (Free-Rider):** Simulates depleted nodes faking 100% battery and 5 ms latency to hijack leadership.
-  * **Byzantine Double-Signing (Equivocation):** Produces conflicting block proposals signed by the same keypair at the same epoch.
-  * **Sybil Infiltration:** Injects rogue votes signed by unregistered cryptographic identities.
-  * **Silent Dropping (DoS):** Simulates unresponsiveness of elected validators to test Byzantine quorum tolerance ($K_t \ge 3f + 1$).
-* Implemented **Byzantine Defense & Anomaly Detector Layer** (`ai_engine/defense_detector.py`):
+### 8.4 Byzantine Defense & Slashing Anomaly Detector
+* **Adversarial Attack Simulation Engine (`simulator/adversarial.py`):**
+  * **Telemetry Spoofing (Free-Rider):** Depleted nodes faking 100% battery and 5 ms latency to game the AI into selecting them as leader.
+  * **Byzantine Double-Signing (Equivocation):** Conflicting block proposals signed by the same keypair at the same epoch.
+  * **Sybil Infiltration:** Rogue votes signed by unregistered cryptographic identities.
+  * **Silent Dropping (DoS):** Unresponsiveness of elected validators testing Byzantine quorum tolerance ($K_t \ge 3f + 1$).
+* **Byzantine Defense & Anomaly Detector Layer (`ai_engine/defense_detector.py`):**
   * **Physics-Informed Sanitization:** Uses Heinzelman radio model equations to detect negative battery discharge and unphysical energy claims, sanitizing telemetry and penalizing reputation.
   * **Cryptographic Equivocation Slashing:** Automatically verifies dual conflicting signatures via `ecrecover` / `Account.recover_message`, triggers on-chain slashing, zeroes reputation, and blacklists rogue nodes.
   * **Sybil Whitelist Filter:** Drops unauthorized signatures before quorum aggregation.
   * **Liveness & Quorum Assurance:** Guarantees consensus finality when faulty nodes $\le f$.
-* Full verification test suite: 11 automated security tests passing (`tests/test_adversarial_defense.py`). Total project tests: 26/26 passing.
-* Headless verification pipeline: `run_phase5_pipeline.py`.
-* Real-time UI integration in `dashboard/app.py`: Interactive attack triggers and security audit log table.
+* Verified via unit tests in `tests/test_adversarial_defense.py`.
 
-### Phase 6: Empirical Benchmarking & Comparative Evaluation (Completed)
-* Developed long-horizon comparative benchmarking engine (`benchmark/benchmark_engine.py`):
-  * Simulates parallel execution across **Static PBFT**, **Fixed Stake-based PoS**, and **AI Adaptive Consensus** under identical radio physics.
-  * Measures **First Node Dead (FND)**, **Network Half-Life**, **Total Joules Dissipated**, **RF Packet Overhead**, and **Battery Variance $\sigma(E)$**.
-* Developed publication chart generator & data exporter (`benchmark/plot_generator.py`):
-  * Exports high-resolution figures: `battery_decay_curves.png`, `cumulative_energy_comparison.png`, `network_survival_curves.png`, and `message_complexity_scaling.png`.
-  * Exports summary metrics to `benchmark_metrics_summary.json` and `.csv`.
-* Key Empirical Findings:
-  * **First Node Dead (FND) Longevity:** In Static PBFT, the first node dies in Round 6. In Static PoS, the fixed leader exhausts battery in Round 15. In AI Adaptive Consensus, **zero nodes died across 100 rounds** ($FND > 100$), representing a **> 6.67x extension** over PoS and **> 16x extension** over PBFT.
-  * **Message Complexity:** Scaled from $\mathcal{O}(N^2)$ (6,850 messages) to bounded $\mathcal{O}(K^2)$ (954 messages), delivering an **86.1% communication reduction**.
+### 8.5 Empirical Benchmarking & Comparative Evaluation
+* Long-horizon comparative benchmarking engine (`benchmark/benchmark_engine.py`) evaluating **Adaptive Consensus** against **Static PBFT** and **Fixed Stake-based PoS** under identical radio physics.
+* **Publication Chart Generator (`benchmark/plot_generator.py`):** Exports high-resolution charts (`battery_decay_curves.png`, `cumulative_energy_comparison.png`, `network_survival_curves.png`, `message_complexity_scaling.png`) and metrics (`benchmark_metrics_summary.json`, `.csv`).
+* **Key Empirical Results:**
+  * **First Node Dead (FND) Longevity:** Static PBFT experiences FND at Round 6; Static PoS exhausts its fixed leader at Round 15; Adaptive Consensus operates over 100 rounds without a single node dying ($FND > 100$), achieving **> 6.67x extension** over PoS and **> 16x extension** over PBFT.
+  * **Message Complexity:** Reduced from $\mathcal{O}(N^2)$ (6,850 messages) to bounded $\mathcal{O}(K^2)$ (954 messages), delivering an **86.1% communication reduction**.
   * **Fleet Energy Uniformity:** Dynamic leadership fatigue successfully eliminated single-node burnout.
-* Automated unit tests: 3 benchmark tests passing (`tests/test_benchmarks.py`). Total project tests: **29/29 passing**.
-* Headless execution runner: `run_phase6_pipeline.py`.
-* Full Word Report generated: `AI_Driven_Consensus_Project_Report.docx` (1.15 MB, embedding all 4 figures and benchmark tables).
+* Verified via unit tests in `tests/test_benchmarks.py`. Total automated test suite: **29/29 passing**.
 
 ---
 
 ## 9. Verification & Quickstart Commands
+
+The entire system is controlled via the master CLI runner `main.py` and modular tool scripts:
 
 ```bash
 # 1. Install Node.js & Hardhat dependencies
@@ -304,27 +322,24 @@ npx hardhat test
 # 4. Install Python dependencies (PyTorch, Gymnasium, Web3, Streamlit, etc.)
 pip install -r requirements.txt
 
-# 5. Run all 29 automated unit tests across all 6 phases
+# 5. Run all 29 automated unit tests across the entire system
 python -m pytest tests/ -v
 
-# 6. Train the Deep Reinforcement Learning (PPO) agent
-python ai_engine/train_rl.py
+# 6. Execute complete unified end-to-end pipeline (consensus + defense + benchmarks)
+python main.py
 
-# 7. Execute Phase 3 (MCDM Heuristic) headless consensus pipeline
-python run_phase3_pipeline.py
+# 7. Execute interactive consensus and Byzantine attack defense demo
+python main.py --mode demo
 
-# 8. Execute Phase 4 (Deep RL Actor-Critic) headless pipeline
-python run_phase4_pipeline.py
+# 8. Execute empirical benchmark against PBFT and PoS baselines
+python main.py --mode benchmark
 
-# 9. Execute Phase 5 (Adversarial Stress Testing & Slashing) headless pipeline
-python run_phase5_pipeline.py
+# 9. Train the Deep Reinforcement Learning (PPO) neural policy
+python main.py --mode train
 
-# 10. Execute Phase 6 (Empirical Benchmarking & Graph Generation) pipeline
-python run_phase6_pipeline.py
+# 10. Generate the complete publication Word dissertation report (.docx)
+python main.py --mode report
 
-# 11. Generate the complete publication Word report (.docx) with embedded figures
-python generate_report_docx.py
-
-# 12. Launch the interactive Streamlit dashboard
+# 11. Launch the real-time interactive Streamlit dashboard
 streamlit run dashboard/app.py
 ```

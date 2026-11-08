@@ -1,5 +1,5 @@
 """
-Unit and Integration Test Suite for Phase 5: Adversarial Stress Testing & Byzantine Defense.
+Unit and Integration Test Suite for Adversarial Stress Testing & Byzantine Defense.
 Verifies:
   1. Adversarial attack injection (Telemetry Spoofing, Equivocation, Sybil, Silent Dropping)
   2. Physics-informed telemetry anomaly detection (Heinzelman dissipation check)
