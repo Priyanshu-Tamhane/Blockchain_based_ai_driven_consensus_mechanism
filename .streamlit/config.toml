@@ -1,0 +1,16 @@
+# Frontend theme for the Adaptive Consensus dashboard.
+# Dark graphite "mission control" surface with a single emerald accent
+# (energy conservation is the core claim of the project).
+
+[theme]
+base = "dark"
+primaryColor = "#2fbf71"
+backgroundColor = "#0a0e13"
+secondaryBackgroundColor = "#131a22"
+textColor = "#e8edf2"
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
