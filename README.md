@@ -72,11 +72,11 @@ npx hardhat test
 *Expected output: `5 passing`.*
 
 ### B. Run Complete Automated Unit & Integration Tests (Pytest)
-Executes all 29 automated tests verifying Heinzelman radio physics, crossover distance, multi-objective utility functions, Gymnasium MDP environment, Actor-Critic networks, telemetry spoofing detection, equivocation slashing, Sybil filtering, and comparative benchmarks:
+Executes all 33 automated tests verifying Heinzelman radio physics, crossover distance, multi-objective utility functions, MDP environment, Actor-Critic networks, telemetry spoofing detection, equivocation slashing, Sybil filtering, RNG isolation, and comparative benchmarks:
 ```bash
 python -m pytest tests/ -v
 ```
-*Expected output: `29 passed in ~13s`.*
+*Expected output: `33 passed in ~7s`.*
 
 ### C. Run the Master Unified Pipeline
 Executes the complete unified workflow: runs the consensus simulation with live attack defense, executes empirical benchmarking against PBFT and PoS baselines, generates publication charts, and builds the Word dissertation report:
@@ -99,6 +99,13 @@ Executes a 100-round head-to-head evaluation against Classical Static PBFT and F
 python main.py --mode benchmark
 ```
 *Outputs: `battery_decay_curves.png`, `cumulative_energy_comparison.png`, `network_survival_curves.png`, `message_complexity_scaling.png`, and `benchmark_metrics_summary.json`.*
+
+### E2. Multi-Seed Robustness Sweep
+The single-seed benchmark is deterministic, but the adaptive arm's distance from exhausting its BFT-viable pool is narrow. Run several seeds to obtain an honest range rather than a single lucky sample:
+```bash
+python main.py --seeds 6 --rounds 100
+```
+*Prints a per-seed table of FND and viable-pool exhaustion. Results as of the current code: the adaptive viable pool survives the full 100 rounds in 5 of 6 seeds, exhausting at round 98 in the sixth.*
 
 ### F. (Optional) Re-Train the Deep RL (PPO) Agent
 To train the Actor-Critic policy network from scratch through the Gymnasium MDP environment:
@@ -127,6 +134,21 @@ Generates the complete technical report with embedded publication figures, empir
 python main.py --mode report
 ```
 *Outputs: `AI_Driven_Consensus_Project_Report.docx` (1.15 MB).*
+
+### I. (Optional) Run the Full On-Chain (Tier 3) Path
+By default the CLI and dashboard run with `use_blockchain=False`, so consensus is fully simulated in Python. To exercise the actual EVM settlement layer, start a local chain and deploy:
+
+```bash
+# Terminal 1: start the local Hardhat node (leave running)
+npx hardhat node
+
+# Terminal 2: deploy the contracts and export the address file
+npx hardhat run scripts/deploy.js --network localhost
+```
+
+This writes `contracts_data/deployment.json`, which `bridge/web3_client.py` resolves relative to the project root. With that file present and the RPC reachable, `ConsensusOrchestrator(use_blockchain=True)` will register nodes in `NodeRegistry.sol`, schedule each epoch committee, submit threshold signatures to `AdaptiveConsensus.sol`, and slash equivocating nodes on-chain.
+
+> **Note:** Tier 3 adds real JSON-RPC transactions, so rounds become noticeably slower than the pure-Python path. The remaining `--mode` commands above do not require a running node.
 
 ---
 
@@ -198,7 +220,7 @@ AI_driven_consensus/
 │   ├── battery_decay_curves.png      # Node battery trajectory curves
 │   ├── cumulative_energy_comparison.png # Joules dissipated vs rounds
 │   ├── network_survival_curves.png   # Kaplan-Meier survival & FND curves
-│   ├── message_complexity_scaling.png# O(N^2) vs O(K^2) message curves
+│   ├── message_complexity_scaling.png# O(N^2) vs O(K) message curves
 │   └── benchmark_metrics_summary.json# Tabular metrics summary export
 │
 ├── bridge/                           # Web3 Orchestration Layer

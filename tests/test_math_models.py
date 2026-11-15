@@ -4,8 +4,10 @@ Heinzelman energy physics, BFT safety bounds, and multi-objective utility scorin
 """
 import pytest
 import math
+import random
 from simulator.energy_model import HeinzelmanEnergyModel, HardwarePreset
 from simulator.models import TelemetryPacket
+from simulator.fleet_simulator import IoTFleetSimulator
 from ai_engine.objective import (
     MultiObjectiveOptimizer,
     ObjectiveWeights,
@@ -78,6 +80,11 @@ class TestMultiObjectiveOptimization:
         assert math.isclose(weights.w_energy, 0.25, rel_tol=1e-3)
         assert math.isclose(weights.w_latency, 0.50, rel_tol=1e-3)
 
+    def test_zero_total_weights_rejected(self):
+        """All-zero weights would previously raise ZeroDivisionError mid-normalization."""
+        with pytest.raises(ValueError, match="positive value"):
+            ObjectiveWeights(w_security=0.0, w_energy=0.0, w_latency=0.0)
+
     def test_feasibility_filtering(self):
         optimizer = MultiObjectiveOptimizer(
             constraints=SystemConstraints(min_battery_threshold=15.0, min_reputation_floor=0.60)
@@ -145,3 +152,38 @@ class TestMultiObjectiveOptimization:
         
         with pytest.raises(ValueError, match="Insufficient viable nodes"):
             optimizer.select_committee(epoch_id=1, telemetry=fleet)
+
+
+class TestFleetSimulatorDeterminism:
+    """
+    Guards the two properties the benchmark's credibility depends on:
+    seeding must be local, and heterogeneity must be reproducible.
+    """
+
+    def test_simulator_seeding_does_not_mutate_global_rng(self):
+        """
+        Constructing a simulator must not reseed the process-wide RNG.
+
+        Regression: the simulator used to call `random.seed(seed)` in __init__,
+        which silently rewrote the global RNG stream for every other consumer
+        (test ordering, dashboard sampling, any later simulation).
+        """
+        random.seed(1234)
+        expected = [random.random() for _ in range(5)]
+
+        random.seed(1234)
+        IoTFleetSimulator(node_count=6, seed=999)  # must be side-effect free
+        actual = [random.random() for _ in range(5)]
+
+        assert expected == actual
+
+    def test_fleet_initialisation_is_reproducible(self):
+        """Same seed must yield identical battery / latency / reputation values."""
+        a = IoTFleetSimulator(node_count=14, seed=42)
+        b = IoTFleetSimulator(node_count=14, seed=42)
+
+        for (a_id, node_a), (b_id, node_b) in zip(a.nodes.items(), b.nodes.items()):
+            assert a_id == b_id
+            assert math.isclose(node_a.battery_pct, node_b.battery_pct, rel_tol=1e-9)
+            assert math.isclose(node_a.base_latency_ms, node_b.base_latency_ms, rel_tol=1e-9)
+            assert math.isclose(node_a.reputation, node_b.reputation, rel_tol=1e-9)

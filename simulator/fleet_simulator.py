@@ -20,18 +20,36 @@ class IoTFleetSimulator:
         default_hardware: HardwarePreset = HardwarePreset.ESP32,
         seed: Optional[int] = 42
     ):
-        if seed is not None:
-            random.seed(seed)
+        # Local RNG instance: seeding a simulator must never mutate the
+        # process-wide `random` state, otherwise simulator construction becomes
+        # an observable side effect for any unrelated code (or test) that draws
+        # from the global generator afterwards.
+        self.rng = random.Random(seed)
 
         self.nodes: Dict[str, IoTNode] = {}
         self.node_address_map: Dict[str, IoTNode] = {}
 
+        # Fleet heterogeneity model: a small minority of devices are near
+        # end-of-life (20-45% charge) while the rest are healthy (60-100%).
+        #
+        # IMPORTANT: the degraded devices are drawn uniformly at random across
+        # the *index space*. Assigning the handicap to fixed low indices (as an
+        # earlier revision did with `if i > 1`) silently rigs every
+        # position-based baseline -- e.g. a "first 5 nodes" PoS committee would
+        # be guaranteed to contain the two weakest devices, inflating the
+        # apparent benefit of adaptation. Random placement keeps the fleet
+        # realistically heterogeneous while making the comparison neutral.
+        degraded_count = max(1, node_count // 7)
+        degraded_indices = set(self.rng.sample(range(node_count), k=degraded_count))
+
         for i in range(node_count):
             node_id = f"Node_{i:02d}"
-            # Realistic spread of initial batteries (e.g. 70% to 100%, with a couple lower)
-            init_batt = random.uniform(60.0, 100.0) if i > 1 else random.uniform(20.0, 45.0)
-            latency = random.uniform(15.0, 45.0)
-            reputation = random.uniform(0.85, 1.0)
+            if i in degraded_indices:
+                init_batt = self.rng.uniform(20.0, 45.0)
+            else:
+                init_batt = self.rng.uniform(60.0, 100.0)
+            latency = self.rng.uniform(15.0, 45.0)
+            reputation = self.rng.uniform(0.85, 1.0)
 
             node = IoTNode(
                 node_id=node_id,
@@ -48,7 +66,7 @@ class IoTFleetSimulator:
         telemetry = []
         for node in self.nodes.values():
             # Add small random latency jitter (+/- 3ms)
-            jitter = random.uniform(-3.0, 3.0)
+            jitter = self.rng.uniform(-3.0, 3.0)
             packet = node.generate_telemetry(latency_jitter_ms=jitter)
             telemetry.append(packet)
         return telemetry

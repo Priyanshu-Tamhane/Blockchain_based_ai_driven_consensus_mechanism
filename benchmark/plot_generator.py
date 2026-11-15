@@ -162,26 +162,41 @@ class BenchmarkPlotGenerator:
         plt.close(fig)
         return str(out_path)
 
-    def plot_message_complexity_scaling(self) -> str:
-        """Plots theoretical and empirical message complexity scaling from N=10 to 100."""
+    def plot_message_complexity_scaling(self, max_committee_size: int = 8, min_k: int = 4) -> str:
+        """
+        Plots ANALYTIC (closed-form) message complexity from N=10 to N=100.
+
+        Message counts follow the same accounting used by the benchmark engine:
+          * PBFT:    (N-1) pre-prepare + (N-1)^2 prepare/commit  -> O(N^2)
+          * PoS:     2 * (5-1) = 8, independent of N
+          * Adaptive: 2 * (K_t - 1), where K_t = min(max(3f+1, N), K_max)
+
+        The adaptive curve is O(K), bounded by K_max -- not O(K^2). An earlier
+        revision hard-coded K = 4 for every N, so this "scaling" figure was a
+        flat line drawn from a literal rather than a function of N.
+        """
         n_vals = np.linspace(10, 100, 19, dtype=int)
-        
+
         # PBFT: (N - 1) + (N - 1)^2 ≈ N^2
         pbft_messages = (n_vals - 1) + (n_vals - 1) ** 2
-        
-        # Fixed PoS (5 validators): (5 - 1) * 2 = 8 messages constant
+
+        # Fixed PoS (5 validators): 2 * (5 - 1) = 8 messages, constant in N
         pos_messages = np.full_like(n_vals, 8)
-        
-        # Adaptive Consensus (dynamic K_t where K = min(8, 3f+1)): (K - 1) * 2
-        adaptive_k = np.array([min(8, 3 * 1 + 1) for _ in n_vals])
-        adaptive_messages = (adaptive_k - 1) * 2
+
+        # Adaptive Consensus: committee grows with the fleet but saturates at K_max
+        adaptive_k = np.clip(n_vals, min_k, max_committee_size)
+        adaptive_messages = 2 * (adaptive_k - 1)
 
         fig, ax = plt.subplots(figsize=(8, 5))
-        fig.suptitle("Communication Message Complexity: O(N²) vs O(K²)", fontweight="bold")
+        fig.suptitle("Message Complexity per Round: O(N²) PBFT vs O(K) Bounded Committee", fontweight="bold")
 
-        ax.plot(n_vals, pbft_messages, label="Static PBFT: O(N²) Quadratic Explosion", color="#ff3333", linewidth=2.5)
-        ax.plot(n_vals, pos_messages, label="Static PoS: Fixed 5 Validators", color="#ff9900", linestyle="-.", linewidth=2)
-        ax.plot(n_vals, adaptive_messages, label="AI Adaptive Consensus: O(K²) Bounded Scalability", color="#00aa44", linewidth=2.5)
+        ax.plot(n_vals, pbft_messages, label="Static PBFT: O(N²) all-to-all broadcast",
+                color="#ff3333", linewidth=2.5)
+        ax.plot(n_vals, pos_messages, label="Static PoS: fixed 5 validators (constant)",
+                color="#ff9900", linestyle="-.", linewidth=2)
+        ax.plot(n_vals, adaptive_messages,
+                label=f"AI Adaptive Consensus: O(K), K ≤ {max_committee_size}",
+                color="#00aa44", linewidth=2.5)
 
         ax.set_xlabel("Total Network Size (N IoT Devices)")
         ax.set_ylabel("Messages Transmitted per Consensus Round")
@@ -203,9 +218,15 @@ class BenchmarkPlotGenerator:
             if pbft_energy > 0:
                 energy_saved_pct = ((pbft_energy - stats.total_energy_dissipated_joules) / pbft_energy) * 100.0
 
+            mean_k = (
+                round(sum(stats.committee_size_history) / len(stats.committee_size_history), 2)
+                if stats.committee_size_history else 0.0
+            )
             summary[name] = {
                 "Protocol": name,
+                "Horizon Rounds": stats.horizon_rounds,
                 "Rounds Executed": stats.rounds_executed,
+                "Mean Committee Size (K_t)": mean_k,
                 "First Node Dead (FND) Round": stats.first_node_dead_round,
                 "Network Half-Life Round": stats.network_half_life_round,
                 "Partition Round (Quorum Loss)": stats.network_partition_round,
@@ -224,7 +245,9 @@ class BenchmarkPlotGenerator:
         csv_path = self.output_dir / "benchmark_metrics_summary.csv"
         fieldnames = [
             "Protocol",
+            "Horizon Rounds",
             "Rounds Executed",
+            "Mean Committee Size (K_t)",
             "First Node Dead (FND) Round",
             "Network Half-Life Round",
             "Partition Round (Quorum Loss)",

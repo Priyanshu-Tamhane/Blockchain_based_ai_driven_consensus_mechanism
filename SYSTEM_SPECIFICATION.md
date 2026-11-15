@@ -15,7 +15,7 @@ The integration of Internet of Things (IoT) edge devices with decentralized dist
 
 ### 1.2 The Proposed Innovation
 An **AI-driven, energy-aware adaptive consensus protocol** that decouples computationally heavy multi-objective optimization from the blockchain settlement layer:
-* **Dynamic Committee Sizing ($K_t$):** Scales down active consensus participation from $N$ to $K_t \ll N$ during stable network epochs, reducing packet complexity from $\mathcal{O}(N^2)$ to $\mathcal{O}(K_t^2)$.
+* **Dynamic Committee Sizing ($K_t$):** Scales down active consensus participation from $N$ to $K_t \ll N$ during stable network epochs, reducing per-round packet complexity from $\mathcal{O}(N^2)$ to $\mathcal{O}(K_t)$.
 * **Health-Aware Validator Rotation:** Actively offloads validation responsibilities to healthy nodes while allowing depleted nodes ($<15\%$) to enter deep-sleep ($15\text{ }\mu\text{A}$), saving up to **98.3% energy per round**.
 * **Byzantine Fault Tolerance Guarantee:** Strictly enforces the theoretical floor $K_t \ge 3f + 1$, preventing security degradation.
 * **Decoupled 3-Tier Architecture:** Heavy floating-point multi-criteria optimization runs off-chain in Python (as an Edge AI Oracle), while Solidity smart contracts on the EVM act purely as a decentralized identity registry, quorum verifier, and slashing enforcer.
@@ -107,7 +107,7 @@ $$U(i) = w_1 \cdot \mathcal{S}_i + w_2 \cdot \overline{E}_{i} - w_3 \cdot \mathc
 +-----------------------------------------------------------------------------------+
 |                     Tier 3: Blockchain Settlement Layer (EVM)                     |
 |   - Local EVM Node (Hardhat / Cancun target @ http://127.0.0.1:8545)             |
-|   - NodeRegistry.sol: Whitelist, public keys, staking, slashing, eligibility     |
+|   - NodeRegistry.sol: Whitelist, public keys, reputation, slashing, eligibility |
 |   - AdaptiveConsensus.sol: Epoch registration, threshold ecrecover, block commit  |
 |   - Emits immutable events: EpochScheduled, BlockCommitted, NodeSlashed           |
 +-----------------------------------------------------------------------------------+
@@ -266,7 +266,7 @@ The system integrates five interdependent engineering subsystems into one unifie
 
 ### 8.2 Smart Contract Settlement Layer (EVM)
 * Implemented `NodeRegistry.sol` and `AdaptiveConsensus.sol` compiled targeting Solidity 0.8.24 and the Cancun EVM.
-* Enforces on-chain cryptographic quorum verification ($\ge \lfloor 2/3 K \rfloor + 1$), node staking, registration whitelisting, and automated slashing.
+* Enforces on-chain cryptographic quorum verification ($\ge \lfloor 2/3 K \rfloor + 1$), node reputation tracking, registration whitelisting, and automated slashing.
 * Verified via 5 automated Hardhat test suites (`tests/contracts/ConsensusTest.js`).
 
 ### 8.3 Intelligent Optimization Engine (MCDM & Deep Reinforcement Learning)
@@ -275,8 +275,11 @@ The system integrates five interdependent engineering subsystems into one unifie
   * Formalized consensus optimization as a **Markov Decision Process (MDP)** in Gymnasium environment (`IoTConsensusEnv`).
   * **Observation State Space ($S_t \in \mathbb{R}^{4N + 2}$):** For each of the $N$ nodes: normalized residual battery, normalized latency, reputation score, and participation/leadership fatigue, augmented with global fleet viability ratio and normalized epoch counter.
   * **Continuous Action Space ($A_t \in \mathbb{R}^{N + 1}$):** Single committee sizing logit $\alpha_{size}$ decoded via sigmoid to $K_t \in [3f+1, \min(N_{viable}, K_{max})]$, plus $N$ continuous priority logits for ranking candidates.
-  * **Composite Multi-Objective Reward Function ($R_t$):**
-    $$R_t = +3.0 \cdot \mathbf{1}_{\text{consensus}} + 1.5 \cdot \overline{E}_{comm} - 1.0 \cdot \sigma^2(E) - 1.2 \cdot \overline{\mathcal{L}}_{comm} - 2.0 \cdot \left(\frac{K_t - K_{min}}{K_{max} - K_{min}}\right) - \mathcal{P}_{BFT}$$
+  * **Composite Multi-Objective Reward Function ($R_t$) — as implemented** (`ai_engine/consensus_env.py`):
+    $$R_t = 2.0 + 1.0\cdot\frac{\overline{E}_{comm}}{100} - 0.5\cdot\frac{\overline{\mathcal{L}}_{comm}}{100} - 0.02\cdot\sigma^2(E) - 20\cdot N_{dead}$$
+
+    Where $\overline{E}_{comm}$ and $\overline{\mathcal{L}}_{comm}$ are the committee's mean battery (%) and mean latency (ms), $\sigma^2(E)$ is the fleet battery variance, and $N_{dead}$ is the number of nodes at 0%. If fewer than $3f+1$ nodes are feasible the episode terminates immediately with $R_t = -50.0$.
+    *Note: an earlier revision of this document described a different reward (a committee-size penalty and a $-15$ BFT term) that was never implemented. The formula above matches the shipped code; the trained weights in `models/drl_consensus_agent.pt` were produced by it.*
   * **Actor-Critic Neural Policy with PPO:** Dual MLP backbones trained with clipped surrogate objective and Generalized Advantage Estimation (GAE). Pre-trained weights saved to `models/drl_consensus_agent.pt`.
 * Fully integrated `DRLCommitteeSelector` into both the interactive Streamlit dashboard (`dashboard/app.py`) and the unified pipeline (`main.py`).
 * Verified via unit tests in `tests/test_drl_agent.py`.
@@ -297,11 +300,13 @@ The system integrates five interdependent engineering subsystems into one unifie
 ### 8.5 Empirical Benchmarking & Comparative Evaluation
 * Long-horizon comparative benchmarking engine (`benchmark/benchmark_engine.py`) evaluating **Adaptive Consensus** against **Static PBFT** and **Fixed Stake-based PoS** under identical radio physics.
 * **Publication Chart Generator (`benchmark/plot_generator.py`):** Exports high-resolution charts (`battery_decay_curves.png`, `cumulative_energy_comparison.png`, `network_survival_curves.png`, `message_complexity_scaling.png`) and metrics (`benchmark_metrics_summary.json`, `.csv`).
-* **Key Empirical Results:**
-  * **First Node Dead (FND) Longevity:** Static PBFT experiences FND at Round 6; Static PoS exhausts its fixed leader at Round 15; Adaptive Consensus operates over 100 rounds without a single node dying ($FND > 100$), achieving **> 6.67x extension** over PoS and **> 16x extension** over PBFT.
-  * **Message Complexity:** Reduced from $\mathcal{O}(N^2)$ (6,850 messages) to bounded $\mathcal{O}(K^2)$ (954 messages), delivering an **86.1% communication reduction**.
-  * **Fleet Energy Uniformity:** Dynamic leadership fatigue successfully eliminated single-node burnout.
-* Verified via unit tests in `tests/test_benchmarks.py`. Total automated test suite: **29/29 passing**.
+* **Key Empirical Results** (seed 42, 14 nodes, 100 rounds, `drain_multiplier=40000`):
+  * **First Node Dead (FND):** Static PBFT loses its first node at round 29 and Static PoS at round 32. Both baselines rotate their proposer, and PoS elects the highest-reputation validators, so neither is handicapped by committee ordering. Adaptive Consensus loses no node to full discharge within the horizon.
+  * **BFT-Viable Pool:** Quarantining devices at the 15% feasibility floor keeps them physically alive, so the binding constraint is BFT viability rather than node death. Across seeds 42–47 the adaptive viable pool survived all 100 rounds in 5 of 6 runs and was exhausted at round 98 in the sixth (`python main.py --seeds 6`). Quote that range, not the single-seed point.
+  * **Energy:** 22.8% less cumulative dissipation than PBFT at seed 42. Total fleet energy is a function of committee *size* (leader / validator / idle costs), not of committee membership, so this figure measures committee sizing rather than per-node load balance.
+  * **Message Complexity:** $\mathcal{O}(K)$ per round, not $\mathcal{O}(K^2)$ — a committee of size $K_t$ needs $2(K_t-1)$ messages (922 at seed 42) versus PBFT's $(N-1)+(N-1)^2$ (7,918).
+  * **Load Balance:** Dynamic leadership fatigue produces uniform per-node discharge. This is visible in battery variance and FND, not in the fleet energy total.
+* Verified via unit tests in `tests/test_benchmarks.py`. Total automated test suite: **33/33 passing**.
 
 ---
 
@@ -322,7 +327,7 @@ npx hardhat test
 # 4. Install Python dependencies (PyTorch, Gymnasium, Web3, Streamlit, etc.)
 pip install -r requirements.txt
 
-# 5. Run all 29 automated unit tests across the entire system
+# 5. Run all 33 automated unit tests across the entire system
 python -m pytest tests/ -v
 
 # 6. Execute complete unified end-to-end pipeline (consensus + defense + benchmarks)

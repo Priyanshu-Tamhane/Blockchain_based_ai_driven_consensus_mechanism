@@ -8,14 +8,14 @@ Coordinates:
   5. On-chain quorum threshold verification (>= floor(2/3*K) + 1)
   6. Post-round Heinzelman physical battery discharge
 """
-import time
 import hashlib
-from typing import Dict, Any, List, Optional, Set
+from typing import Dict, Any, List, Optional
 from simulator.fleet_simulator import IoTFleetSimulator
 from simulator.energy_model import HardwarePreset
-from simulator.adversarial import AdversarialInjector, AttackType, EquivocationPayload
+from simulator.models import ConsensusVote
+from simulator.adversarial import AdversarialInjector, AttackType
 from ai_engine.objective import MultiObjectiveOptimizer, ObjectiveWeights, SystemConstraints
-from ai_engine.defense_detector import ByzantineDefenseDetector, SecurityAlert
+from ai_engine.defense_detector import ByzantineDefenseDetector
 from .web3_client import BlockchainClient
 
 
@@ -131,6 +131,7 @@ class ConsensusOrchestrator:
 
         # 7. Collect Committee Signatures (with Silent Dropping simulation)
         valid_signatures = []
+        signer_addresses = []
         for addr in directive.members:
             node = self.simulator.get_node_by_address(addr)
             if not node:
@@ -144,6 +145,7 @@ class ConsensusOrchestrator:
 
             sig = node.sign_hash(raw_hash)
             valid_signatures.append(sig)
+            signer_addresses.append(node.address)
 
         # 8. Filter Sybil Injection Attacks if armed
         for attack in self.adversary.active_attacks.values():
@@ -154,8 +156,23 @@ class ConsensusOrchestrator:
                     epoch_id, [sybil_vote], registered_set, set(directive.members)
                 )
 
-        # 9. Byzantine Quorum Verification
-        is_quorum_achieved = len(valid_signatures) >= directive.quorum_threshold
+        # 9. Byzantine Quorum & Liveness Verification
+        # Routed through the defense detector (rather than an inline length
+        # check) so that non-responsive committee members are actually recorded
+        # in node_history and a security alert is raised when quorum is missed.
+        votes = [
+            ConsensusVote(
+                epoch_id=epoch_id,
+                block_number=block_num,
+                block_hash=raw_hash,
+                voter_address=addr,
+                signature=sig
+            )
+            for addr, sig in zip(signer_addresses, valid_signatures)
+        ]
+        is_quorum_achieved, _liveness_alert = self.defense.check_liveness_and_quorum(
+            epoch_id, directive, votes
+        )
 
         # 10. Submit Block & Quorum Verification on EVM
         if is_quorum_achieved and self.use_blockchain and self.blockchain and self.blockchain.is_connected():

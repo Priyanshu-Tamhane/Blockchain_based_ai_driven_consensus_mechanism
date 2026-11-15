@@ -19,8 +19,20 @@ class BlockchainClient:
         artifacts_dir: str = "artifacts/contracts"
     ):
         self.w3 = Web3(Web3.HTTPProvider(rpc_url))
-        self.deployment_file = deployment_file
-        self.artifacts_dir = artifacts_dir
+
+        # Resolve artifact/deployment paths against the *project root* rather
+        # than the process working directory. Launching the dashboard, a test,
+        # or the pipeline from a subdirectory previously made the contract
+        # artefacts silently invisible, which disabled Tier 3 without warning.
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.deployment_file = (
+            deployment_file if os.path.isabs(deployment_file)
+            else os.path.join(project_root, deployment_file)
+        )
+        self.artifacts_dir = (
+            artifacts_dir if os.path.isabs(artifacts_dir)
+            else os.path.join(project_root, artifacts_dir)
+        )
         
         # Default account (Hardhat Account #0)
         self.default_account = self.w3.eth.accounts[0] if self.w3.is_connected() and len(self.w3.eth.accounts) > 0 else None

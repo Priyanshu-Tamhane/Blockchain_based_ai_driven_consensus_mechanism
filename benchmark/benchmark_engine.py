@@ -5,16 +5,16 @@ Compares:
   2. Fixed Stake-Based PoS Baseline (Fixed validator subset, no energy awareness)
   3. AI-Driven Adaptive Consensus (Dynamic K_t >= 3f + 1, Health-aware rotation, deep sleep)
 """
-import copy
 import math
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 
 from simulator.fleet_simulator import IoTFleetSimulator
 from simulator.energy_model import HeinzelmanEnergyModel, HardwarePreset
-from simulator.models import TelemetryPacket, CommitteeDirective
 from ai_engine.objective import MultiObjectiveOptimizer, ObjectiveWeights, SystemConstraints
-from ai_engine.drl_agent import DRLCommitteeSelector
+# NOTE: ai_engine.drl_agent (and therefore torch) is imported lazily inside
+# _run_adaptive so that running the MCDM benchmark never pays the multi-second
+# torch import cost.
 
 
 @dataclass
@@ -22,6 +22,10 @@ class ProtocolBenchmarkStats:
     """Stores round-by-round and summary benchmark metrics for a single consensus protocol."""
     protocol_name: str
     rounds_executed: int = 0
+    # Requested simulation horizon. Recorded so downstream consumers (charts,
+    # JSON export, the Word report) can render "None (>N)" markers without
+    # re-guessing the bound from however many rounds actually completed.
+    horizon_rounds: int = 0
     first_node_dead_round: Optional[int] = None
     network_half_life_round: Optional[int] = None
     network_partition_round: Optional[int] = None
@@ -31,6 +35,9 @@ class ProtocolBenchmarkStats:
     
     # Time series trajectories
     alive_nodes_history: List[int] = field(default_factory=list)
+    # Active committee size K_t per round. Needed to report committee-size
+    # distributions and to justify message-count comparisons analytically.
+    committee_size_history: List[int] = field(default_factory=list)
     cumulative_energy_history: List[float] = field(default_factory=list)
     cumulative_messages_history: List[int] = field(default_factory=list)
     mean_battery_history: List[float] = field(default_factory=list)
@@ -80,6 +87,10 @@ class ConsensusBenchmarkRunner:
             "Static PoS (Fixed Stake)": self._run_static_pos(max_rounds),
             "AI Adaptive Consensus": self._run_adaptive(max_rounds, drl_model_path=drl_model_path)
         }
+        # Stamp the requested horizon onto every arm so "no death" markers can be
+        # rendered unambiguously downstream.
+        for stats in results.values():
+            stats.horizon_rounds = max_rounds
         return results
 
     def _run_static_pbft(self, max_rounds: int) -> ProtocolBenchmarkStats:
@@ -98,6 +109,8 @@ class ConsensusBenchmarkRunner:
         for r in range(1, max_rounds + 1):
             alive_count = sum(1 for n in fleet.nodes.values() if n.is_alive)
             stats.alive_nodes_history.append(alive_count)
+            # In PBFT every live node validates, so the active set equals the fleet.
+            stats.committee_size_history.append(alive_count)
 
             # Record metrics
             if alive_count < self.node_count and stats.first_node_dead_round is None:
@@ -117,7 +130,11 @@ class ConsensusBenchmarkRunner:
             # Energy dissipation: 1 Leader + (alive_count - 1) Validators
             round_energy = 0.0
             nodes_list = [n for n in fleet.nodes.values() if n.is_alive]
-            leader_node = nodes_list[0] if nodes_list else None
+            # Round-robin primary rotation. A real PBFT deployment rotates the
+            # primary on every view change; pinning the primary to index 0 for
+            # the whole run would guarantee that a single node absorbs every
+            # leader cost, which materially skews the First-Node-Dead result.
+            leader_node = nodes_list[(r - 1) % len(nodes_list)] if nodes_list else None
 
             for node in fleet.nodes.values():
                 if not node.is_alive:
@@ -158,8 +175,16 @@ class ConsensusBenchmarkRunner:
         for node_id in fleet.nodes.keys():
             stats.node_battery_trajectories[node_id] = []
 
-        # Statically designate first 5 nodes as permanent validators
-        fixed_validators = list(fleet.nodes.keys())[:5]
+        # Static stake-based election: the 5 highest-reputation devices (the
+        # closest available proxy for highest stake) are permanently elected.
+        # Selecting by *position* instead -- `list(...)[:5]` -- would correlate
+        # the committee with fleet ordering rather than stake, which is not what
+        # a stake-based protocol does and biases the comparison.
+        validator_count = min(5, self.node_count)
+        fixed_validators = sorted(
+            fleet.nodes.keys(),
+            key=lambda nid: -fleet.nodes[nid].reputation
+        )[:validator_count]
         cum_energy = 0.0
         cum_messages = 0
 
@@ -167,6 +192,8 @@ class ConsensusBenchmarkRunner:
             alive_count = sum(1 for n in fleet.nodes.values() if n.is_alive)
             active_validators_alive = sum(1 for v_id in fixed_validators if fleet.nodes[v_id].is_alive)
             stats.alive_nodes_history.append(alive_count)
+            # Active set is the still-alive fixed validator committee.
+            stats.committee_size_history.append(active_validators_alive)
 
             if alive_count < self.node_count and stats.first_node_dead_round is None:
                 stats.first_node_dead_round = r
@@ -177,9 +204,18 @@ class ConsensusBenchmarkRunner:
                 break  # Fixed validator committee exhausted
 
             # Messages: Leader transmits to K-1, validators reply
-            round_messages = (len(fixed_validators) - 1) * 2
+            round_messages = max(0, active_validators_alive - 1) * 2
             cum_messages += round_messages
             stats.cumulative_messages_history.append(cum_messages)
+
+            # Rotate the proposer slot across the (alive) fixed validator set,
+            # mirroring how stake-based protocols rotate block proposers. A
+            # permanently pinned leader would burn out the same device every
+            # round and confound "energy-blind selection" with "no rotation".
+            alive_validators = [v for v in fixed_validators if fleet.nodes[v].is_alive]
+            current_proposer = (
+                alive_validators[(r - 1) % len(alive_validators)] if alive_validators else None
+            )
 
             round_energy = 0.0
             for node_id, node in fleet.nodes.items():
@@ -188,7 +224,7 @@ class ConsensusBenchmarkRunner:
                     continue
 
                 if node_id in fixed_validators:
-                    is_lead = (node_id == fixed_validators[0])
+                    is_lead = (node_id == current_proposer)
                     node.set_consensus_role(is_validator=True, is_leader=is_lead)
                     e_discharged = node.discharge_round_energy(
                         committee_size=len(fixed_validators),
@@ -237,6 +273,7 @@ class ConsensusBenchmarkRunner:
 
         # Initialize selector (DRL if available, else MCDM optimizer)
         if drl_model_path:
+            from ai_engine.drl_agent import DRLCommitteeSelector
             selector = DRLCommitteeSelector(model_path=drl_model_path, node_count=self.node_count)
         else:
             selector = MultiObjectiveOptimizer(
@@ -273,6 +310,7 @@ class ConsensusBenchmarkRunner:
 
             # Messages: Leader transmits to K_t - 1, validators transmit votes back
             k = directive.committee_size
+            stats.committee_size_history.append(k)
             round_messages = (k - 1) * 2
             cum_messages += round_messages
             stats.cumulative_messages_history.append(cum_messages)

@@ -3,12 +3,56 @@ Generates a comprehensive Word document (.docx) containing the complete project 
 mathematical formulations, architecture, implementation guide, experimental results,
 10-slide presentation script, and viva defense Q&A.
 """
+import json
+import os
+
 import docx
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
+
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+BENCHMARK_SUMMARY_PATH = os.path.join(PROJECT_ROOT, "benchmark_results", "benchmark_metrics_summary.json")
+
+
+def load_benchmark_summary():
+    """
+    Loads the generated benchmark metrics so that every number quoted in the
+    report is derived from an actual run rather than typed in by hand.
+
+    The previous revision hard-coded FND / energy / message figures, which meant
+    the report silently disagreed with the code after any benchmark change.
+    """
+    if not os.path.exists(BENCHMARK_SUMMARY_PATH):
+        return None
+    with open(BENCHMARK_SUMMARY_PATH, "r") as f:
+        return json.load(f)
+
+
+def _fmt_marker(value, horizon):
+    """Formats an optional round number as 'Round N' or 'None (> horizon)'."""
+    if value in (None, "null", ""):
+        return f"None (>{horizon})"
+    try:
+        return f"Round {int(value)}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _fmt_int(value):
+    try:
+        return f"{int(round(float(value))):,}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _fmt_joules(value):
+    try:
+        return f"{float(value):,.0f} J"
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def set_cell_background(cell, fill_hex):
@@ -341,8 +385,39 @@ def create_document():
         "paradigms under identical radio physics: (1) Classical Static PBFT, and (2) Static Stake-Based PoS with fixed validators."
     )
 
-    # Benchmark Results Table
-    bench_table = doc.add_table(rows=4, cols=6)
+    # ------------------------------------------------------------------ #
+    # Benchmark results are READ from benchmark_results/, never typed in.
+    # ------------------------------------------------------------------ #
+    summary = load_benchmark_summary()
+    horizon = 100
+    bench_rows = []
+
+    if summary:
+        horizon = max(
+            (int(v.get("Horizon Rounds") or 0) for v in summary.values()),
+            default=100
+        ) or 100
+
+        for key in ("Static PBFT", "Static PoS (Fixed Stake)", "AI Adaptive Consensus"):
+            record = summary.get(key)
+            if not record:
+                continue
+            saved_txt = (
+                "Baseline" if key == "Static PBFT"
+                else f"{float(record.get('Energy Savings vs PBFT (%)', 0.0)):.1f}%"
+            )
+            bench_rows.append((
+                record.get("Protocol", key),
+                _fmt_marker(record.get("First Node Dead (FND) Round"), horizon),
+                _fmt_marker(record.get("Network Half-Life Round"), horizon),
+                _fmt_joules(record.get("Total Energy Dissipated (Joules)")),
+                _fmt_int(record.get("Total Messages Exchanged")),
+                saved_txt,
+            ))
+    else:
+        bench_rows.append(("Benchmark not yet run", "-", "-", "-", "-", "-"))
+
+    bench_table = doc.add_table(rows=1 + len(bench_rows), cols=6)
     bench_table.alignment = WD_TABLE_ALIGNMENT.CENTER
     bench_headers = ["Consensus Protocol", "FND (Round)", "Half-Life", "Energy (J)", "Messages", "Energy Saved %"]
     for c_idx, h in enumerate(bench_headers):
@@ -352,12 +427,7 @@ def create_document():
         set_cell_margins(cell, 80, 80, 100, 100)
         cell.paragraphs[0].runs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
 
-    bench_data = [
-        ("Static PBFT (All N=14)", "Round 6", "Round 59", "352,470 J", "6,850", "0.0% (Baseline)"),
-        ("Static PoS (Fixed Stake)", "Round 15", "None (>100)", "48,404 J", "240", "86.3% (Unbalanced)"),
-        ("AI Adaptive Consensus", "None (>100)", "None (>100)", "246,201 J", "954", "30.1% (Balanced)")
-    ]
-    for r_idx, row_data in enumerate(bench_data):
+    for r_idx, row_data in enumerate(bench_rows):
         row = bench_table.rows[r_idx + 1]
         for c_idx, val in enumerate(row_data):
             cell = row.cells[c_idx]
@@ -365,21 +435,52 @@ def create_document():
             set_cell_background(cell, "FFFFFF" if r_idx % 2 == 0 else "F9FBFD")
             set_cell_margins(cell, 60, 60, 100, 100)
 
-    add_callout(
-        "Key Empirical Finding: In Static PBFT, the first node dies in Round 6 due to continuous N^2 broadcasts. In Static PoS, the fixed leader "
-        "burns out in Round 15, partitioning the network. In AI Adaptive Consensus, ZERO nodes died across all 100 rounds (FND > 100), "
-        "representing an over 6.67x extension in operational lifespan over PoS, and over 16x extension over PBFT.",
-        title="BENCHMARK BREAKTHROUGH"
-    )
+    if summary:
+        pbft_r = summary.get("Static PBFT", {})
+        pos_r = summary.get("Static PoS (Fixed Stake)", {})
+        adp_r = summary.get("AI Adaptive Consensus", {})
+        pbft_fnd = pbft_r.get("First Node Dead (FND) Round")
+        pos_fnd = pos_r.get("First Node Dead (FND) Round")
+        adp_fnd = adp_r.get("First Node Dead (FND) Round")
+        adp_pool = adp_r.get("Partition Round (Quorum Loss)")
+
+        parts = [
+            f"Under identical Heinzelman radio physics over {horizon} rounds, Static PBFT loses its first node at "
+            f"round {pbft_fnd} and Static PoS at round {pos_fnd}."
+        ]
+        if adp_fnd is None:
+            if adp_pool:
+                parts.append(
+                    "Adaptive Consensus lost no node to full discharge within the horizon. That is a consequence of "
+                    "quarantining devices at the 15% feasibility floor, not of unlimited energy: its binding constraint "
+                    f"is BFT viability, and the viable pool was exhausted at round {adp_pool}."
+                )
+            else:
+                parts.append(
+                    "Adaptive Consensus lost no node, and its BFT-viable pool remained intact beyond the horizon."
+                )
+        else:
+            parts.append(f"Adaptive Consensus lost its first node at round {adp_fnd}.")
+
+        parts.append(
+            f"It dissipated {adp_r.get('Energy Savings vs PBFT (%)', 0.0):.1f}% less energy than PBFT while exchanging "
+            f"{_fmt_int(adp_r.get('Total Messages Exchanged'))} messages versus "
+            f"{_fmt_int(pbft_r.get('Total Messages Exchanged'))}."
+        )
+        add_callout(" ".join(parts), title="EMPIRICAL FINDING")
+    else:
+        add_callout(
+            "Run `python main.py --mode benchmark --rounds 100` to populate this section with measured results.",
+            title="BENCHMARK NOT RUN"
+        )
 
     add_h2("8.1 Publication Figures & Graphical Analysis")
-    import os
-    fig_dir = "benchmark_results"
+    fig_dir = os.path.join(PROJECT_ROOT, "benchmark_results")
     charts = [
         ("battery_decay_curves.png", "Figure 1: Individual Node Battery Decay Curves Across Consensus Paradigms. Demonstrates uniform, balanced discharge in Adaptive Consensus versus rapid single-node burnout in PoS and parallel collapse in PBFT."),
-        ("cumulative_energy_comparison.png", "Figure 2: Cumulative Energy Dissipation Trajectory. Adaptive Consensus preserves over 30% total fleet energy compared to PBFT while maintaining full BFT security."),
+        ("cumulative_energy_comparison.png", "Figure 2: Cumulative Energy Dissipation Trajectory. Adaptive Consensus preserves fleet energy relative to PBFT while maintaining full BFT security."),
         ("network_survival_curves.png", "Figure 3: Network Survival & Node Longevity Curves. Highlights First Node Dead (FND) and Network Half-Life resilience under dynamic AI role rotation."),
-        ("message_complexity_scaling.png", "Figure 4: Communication Message Complexity Scaling. Compares O(N^2) quadratic messaging in PBFT versus O(K^2) bounded messaging in AI Adaptive Consensus as network size scales from 10 to 100 devices.")
+        ("message_complexity_scaling.png", "Figure 4: Message Complexity per Round. PBFT broadcasts all-to-all (O(N^2)) whereas a committee of size K_t only needs 2*(K_t - 1) messages (O(K)), bounded by K_max, as the network scales from 10 to 100 devices.")
     ]
     for filename, caption in charts:
         img_path = os.path.join(fig_dir, filename)
@@ -401,10 +502,10 @@ def create_document():
         ("Slide 4: Decoupled 3-Tier Architecture", "Explains architectural separation: Tier 1 Virtual ESP32 Fleet -> Tier 2 Edge AI Controller / Oracle -> Tier 3 Solidity Smart Contracts on the EVM (NodeRegistry.sol and AdaptiveConsensus.sol)."),
         ("Slide 5: Deep Reinforcement Learning", "Details upgrading to Actor-Critic PPO policy network trained in a Gymnasium MDP environment, optimizing composite rewards over a 58-dimensional state space."),
         ("Slide 6: Adversarial Attack Suite & Defense", "Outlines simulated attacks: Telemetry Spoofing, Byzantine Double-Signing, Sybil Infiltration, and Validator Silent Dropping, with automated physics-based sanitization and on-chain slashing."),
-        ("Slide 7: Empirical Benchmarking", "Compares performance against Static PBFT and Fixed PoS over 100 rounds: Adaptive Consensus extends First Node Dead (FND) by over 6.67x over PoS and over 16x over PBFT."),
-        ("Slide 8: Communication & Scalability Gains", "Demonstrates reduction of message complexity from quadratic O(N^2) to bounded O(K^2), cutting network packets by 86% and eliminating RF broadcast storms."),
+        ("Slide 7: Empirical Benchmarking", "Compares performance against Static PBFT and stake-ordered Fixed PoS over the simulation horizon under identical radio physics, reporting First Node Dead, BFT-viable-pool exhaustion, cumulative energy and message counts (Section 8)."),
+        ("Slide 8: Communication & Scalability Gains", "Demonstrates reduction of per-round message complexity from quadratic O(N^2) all-to-all broadcast to bounded O(K) committee messaging, sharply reducing packets and eliminating RF broadcast storms."),
         ("Slide 9: Interactive Demonstration Interface", "Showcases the real-time Streamlit dashboard with DRL/MCDM toggle, live fleet battery gauges, attack injection controls, and on-chain security audit logging."),
-        ("Slide 10: Conclusion & Deliverables", "Summarizes key contributions: complete unified codebase, 29 passing unit tests, verified EVM contracts, publication-ready figures, and full thesis documentation."),
+        ("Slide 10: Conclusion & Deliverables", "Summarizes key contributions: complete unified codebase, the full automated test suite, verified EVM contracts, publication-ready figures, and complete thesis documentation."),
     ]
     for title, desc in slides_content:
         add_p(f"{desc}", f"{title}: ")

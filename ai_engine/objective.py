@@ -17,6 +17,12 @@ class ObjectiveWeights:
 
     def __post_init__(self):
         total = self.w_security + self.w_energy + self.w_latency
+        if total <= 0:
+            raise ValueError(
+                "Objective weights must sum to a positive value; "
+                f"got w_security={self.w_security}, w_energy={self.w_energy}, "
+                f"w_latency={self.w_latency}."
+            )
         if not math.isclose(total, 1.0, rel_tol=1e-3):
             # Normalize automatically if not strictly 1.0
             self.w_security /= total
@@ -31,7 +37,10 @@ class SystemConstraints:
     min_reputation_floor: float = 0.60       # R_min [0.0, 1.0]
     byzantine_tolerance_f: int = 1           # Maximum tolerated Byzantine nodes (f)
     min_committee_size: int = 4              # 3f + 1 when f = 1
-    max_committee_size: int = 10             # Scaled down to prevent broadcast storms
+    # Cap keeps the committee small enough to avoid a broadcast storm. Must stay
+    # in lockstep with IoTConsensusEnv.max_k and DRLCommitteeSelector.max_k --
+    # otherwise the MCDM and DRL arms would report incomparable message counts.
+    max_committee_size: int = 8
     max_latency_ms: float = 200.0            # Latency cap for normalization
 
 

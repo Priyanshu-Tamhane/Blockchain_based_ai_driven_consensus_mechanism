@@ -32,9 +32,10 @@ os.environ["MPLCONFIGDIR"] = str(tmp_dir)
 from bridge.orchestrator import ConsensusOrchestrator
 from simulator.adversarial import AttackType
 from simulator.energy_model import HardwarePreset
-from ai_engine.drl_agent import DRLCommitteeSelector
 from benchmark.benchmark_engine import ConsensusBenchmarkRunner
 from benchmark.plot_generator import BenchmarkPlotGenerator
+# NOTE: ai_engine.drl_agent (and therefore torch) is imported lazily inside
+# run_consensus_demo, so `--optimizer mcdm` never pays the torch import cost.
 
 
 def run_consensus_demo(use_drl: bool = True):
@@ -48,6 +49,7 @@ def run_consensus_demo(use_drl: bool = True):
     engine_name = "Heuristic MCDM Optimizer"
 
     if use_drl and model_path.exists():
+        from ai_engine.drl_agent import DRLCommitteeSelector
         drl_selector = DRLCommitteeSelector(model_path=str(model_path), node_count=14)
         engine_name = "Deep Reinforcement Learning (PPO Policy)"
 
@@ -64,7 +66,7 @@ def run_consensus_demo(use_drl: bool = True):
     print(f"[*] Defense Layer:        Physics-Informed Heinzelman Sanitizer + ECDSA Slashing")
 
     print("\n" + "-" * 96)
-    print(f"{'Epoch':<8}{'Block #':<10}{'Execution Stage':<36}{'K_size':<8}{'Quorum':<8}{'Sigs':<8}{'Status':<12}")
+    print(f"{'Epoch':<8}{'Block #':<10}{'Execution Stage':<40}{'K_size':<8}{'Quorum':<8}{'Sigs':<8}{'Status':<12}")
     print("-" * 96)
 
     # 1. Baseline Honest Rounds
@@ -73,7 +75,7 @@ def run_consensus_demo(use_drl: bool = True):
         print(
             f"{summary['epoch_id']:<8}"
             f"#{summary['block_number']:<9}"
-            f"{'Honest Consensus Round':<36}"
+            f"{'Honest Consensus Round':<40}"
             f"{summary['committee_size']:<8}"
             f"{summary['quorum_threshold']:<8}"
             f"{summary['signatures_collected']:<8}"
@@ -90,7 +92,7 @@ def run_consensus_demo(use_drl: bool = True):
     print(
         f"{summary_3['epoch_id']:<8}"
         f"#{summary_3['block_number']:<9}"
-        f"{'Intercepted: Telemetry Spoofing':<36}"
+        f"{'Intercepted: Telemetry Spoofing':<40}"
         f"{summary_3['committee_size']:<8}"
         f"{summary_3['quorum_threshold']:<8}"
         f"{summary_3['signatures_collected']:<8}"
@@ -106,7 +108,7 @@ def run_consensus_demo(use_drl: bool = True):
     print(
         f"{summary_4['epoch_id']:<8}"
         f"#{summary_4['block_number']:<9}"
-        f"{'Intercepted & Slashed: Double-Signing':<36}"
+        f"{'Intercepted & Slashed: Double-Signing':<40}"
         f"{summary_4['committee_size']:<8}"
         f"{summary_4['quorum_threshold']:<8}"
         f"{summary_4['signatures_collected']:<8}"
@@ -120,7 +122,7 @@ def run_consensus_demo(use_drl: bool = True):
     print(
         f"{summary_5['epoch_id']:<8}"
         f"#{summary_5['block_number']:<9}"
-        f"{'Intercepted: Rogue Sybil Infiltration':<36}"
+        f"{'Intercepted: Rogue Sybil Infiltration':<40}"
         f"{summary_5['committee_size']:<8}"
         f"{summary_5['quorum_threshold']:<8}"
         f"{summary_5['signatures_collected']:<8}"
@@ -135,7 +137,7 @@ def run_consensus_demo(use_drl: bool = True):
     print(
         f"{summary_6['epoch_id']:<8}"
         f"#{summary_6['block_number']:<9}"
-        f"{'Fault Tolerated: Silent Dropping (DoS)':<36}"
+        f"{'Fault Tolerated: Silent Dropping (DoS)':<40}"
         f"{summary_6['committee_size']:<8}"
         f"{summary_6['quorum_threshold']:<8}"
         f"{summary_6['signatures_collected']:<8}"
@@ -190,42 +192,129 @@ def run_benchmarks(max_rounds: int = 100):
     adaptive_energy = results["AI Adaptive Consensus"].total_energy_dissipated_joules
     saved_pct = ((pbft_energy - adaptive_energy) / pbft_energy) * 100.0 if pbft_energy > 0 else 0.0
 
-    print("\n" + "=" * 100)
-    print(f"{'Consensus Protocol':<28}{'FND (Round)':<14}{'Half-Life':<14}{'Total Energy (J)':<18}{'Messages':<14}{'Energy Saved %':<16}")
-    print("-" * 100)
+    print("\n" + "=" * 104)
+    print(f"{'Consensus Protocol':<28}{'FND':<12}{'Half-Life':<12}{'Viable Pool':<14}{'Energy (J)':<14}{'Messages':<12}{'Saved %':<12}")
+    print("-" * 104)
 
     for proto_name, stats in results.items():
         energy_pct = 0.0
         if pbft_energy > 0:
             energy_pct = ((pbft_energy - stats.total_energy_dissipated_joules) / pbft_energy) * 100.0
 
-        fnd_str = str(stats.first_node_dead_round) if stats.first_node_dead_round else f"None (>{max_rounds})"
-        hl_str = str(stats.network_half_life_round) if stats.network_half_life_round else f"None (>{max_rounds})"
+        fnd_str = str(stats.first_node_dead_round) if stats.first_node_dead_round else f"> {max_rounds}"
+        hl_str = str(stats.network_half_life_round) if stats.network_half_life_round else f"> {max_rounds}"
+        pool_str = str(stats.network_partition_round) if stats.network_partition_round else f"> {max_rounds}"
 
         print(
             f"{proto_name:<28}"
-            f"{fnd_str:<14}"
-            f"{hl_str:<14}"
-            f"{stats.total_energy_dissipated_joules:<18.1f}"
-            f"{stats.total_messages_exchanged:<14}"
-            f"{f'{energy_pct:.1f}%' if proto_name != 'Static PBFT' else '0.0% (Baseline)':<16}"
+            f"{fnd_str:<12}"
+            f"{hl_str:<12}"
+            f"{pool_str:<14}"
+            f"{stats.total_energy_dissipated_joules:<14.1f}"
+            f"{stats.total_messages_exchanged:<12}"
+            f"{f'{energy_pct:.1f}%' if proto_name != 'Static PBFT' else 'baseline':<12}"
         )
-    print("=" * 100)
+    print("=" * 104)
+    print("  FND         = first round in which any node's battery reaches 0%")
+    print("  Viable Pool = first round in which fewer than K_min = 3f+1 nodes remain")
+    print("                above the 15% feasibility floor (consensus can no longer form)")
 
-    pbft_fnd = results["Static PBFT"].first_node_dead_round or max_rounds
-    pos_fnd = results["Static PoS (Fixed Stake)"].first_node_dead_round or max_rounds
-    adp_fnd = results["AI Adaptive Consensus"].first_node_dead_round or max_rounds
+    pbft_stats = results["Static PBFT"]
+    pos_stats = results["Static PoS (Fixed Stake)"]
+    adp_stats = results["AI Adaptive Consensus"]
+
+    pbft_fnd = pbft_stats.first_node_dead_round or max_rounds
+    pos_fnd = pos_stats.first_node_dead_round or max_rounds
+    adp_fnd = adp_stats.first_node_dead_round
 
     print("\n[*] Key Research Metrics:")
-    if pos_fnd > 0:
-        lifespan_mult = adp_fnd / pos_fnd
-        print(f"    - First Node Dead (FND) Extension: Adaptive Consensus extends FND by {lifespan_mult:.2f}x over Static PoS.")
+    if adp_fnd is None:
+        print(
+            f"    - Node Longevity:                   No node reached 0% within {max_rounds} rounds "
+            f"(vs. Round {pbft_fnd} for PBFT, Round {pos_fnd} for PoS)."
+        )
+        # Be explicit that quarantine, not infinite energy, is what keeps nodes alive.
+        if adp_stats.network_partition_round:
+            print(
+                f"    - Binding Constraint:               Quarantining nodes at 15% preserves them physically, "
+                f"but the BFT-viable pool is exhausted at round {adp_stats.network_partition_round}."
+            )
+        else:
+            print(f"    - Binding Constraint:               Viable pool intact beyond round {max_rounds}.")
+    else:
+        print(
+            f"    - First Node Dead Extension:        {adp_fnd / max(1, pos_fnd):.2f}x over PoS, "
+            f"{adp_fnd / max(1, pbft_fnd):.2f}x over PBFT."
+        )
+
     print(f"    - Net Energy Conservation:          {saved_pct:.1f}% reduction in cumulative battery dissipation vs. PBFT.")
-    print(f"    - Message Volume Scalability:       O(K^2) bounded messaging prevents RF channel saturation.")
+    print(f"    - Message Volume Scalability:       2*(K-1) = O(K) bounded messaging per round "
+          f"(vs. O(N^2) for PBFT) prevents RF channel saturation.")
 
     print("\n[*] Generated Publication Figures:")
     for key, path in saved_files.items():
         print(f"    - [{key}]: {path}")
+
+
+def run_robustness(n_seeds: int = 6, max_rounds: int = 100):
+    """
+    Multi-seed robustness sweep.
+
+    A single-seed headline can hide how close the adaptive arm is to exhausting
+    its BFT-viable pool. Running consecutive seeds turns a single lucky point
+    sample into a range that can be defended under questioning.
+    """
+    print("\n" + "=" * 104)
+    print("   MULTI-SEED ROBUSTNESS SWEEP")
+    print("=" * 104)
+
+    model_path = ROOT_DIR / "models" / "drl_consensus_agent.pt"
+    drl_path_str = str(model_path) if model_path.exists() else None
+    seeds = list(range(42, 42 + n_seeds))
+
+    print(f"[*] Seeds:            {seeds}")
+    print(f"[*] Horizon per seed: {max_rounds} rounds\n")
+    print(
+        f"{'Seed':<8}{'PBFT FND':<12}{'PoS FND':<12}"
+        f"{'Adaptive FND':<16}{'Adaptive Pool':<18}{'Adaptive Energy (J)':<22}"
+    )
+    print("-" * 104)
+
+    adaptive_pools = []
+    for seed in seeds:
+        runner = ConsensusBenchmarkRunner(
+            node_count=14,
+            hardware=HardwarePreset.ESP32,
+            byzantine_f=1,
+            drain_multiplier=40000.0,
+            seed=seed
+        )
+        results = runner.run_benchmark(max_rounds=max_rounds, drl_model_path=drl_path_str)
+        pbft = results["Static PBFT"]
+        pos = results["Static PoS (Fixed Stake)"]
+        adp = results["AI Adaptive Consensus"]
+        adaptive_pools.append(adp.network_partition_round)
+
+        print(
+            f"{seed:<8}"
+            f"{str(pbft.first_node_dead_round or f'>{max_rounds}'):<12}"
+            f"{str(pos.first_node_dead_round or f'>{max_rounds}'):<12}"
+            f"{str(adp.first_node_dead_round or f'>{max_rounds}'):<16}"
+            f"{str(adp.network_partition_round or f'>{max_rounds}'):<18}"
+            f"{adp.total_energy_dissipated_joules:<22.1f}"
+        )
+    print("-" * 104)
+
+    survived = sum(1 for p in adaptive_pools if p is None)
+    print(
+        f"\n[*] Adaptive BFT-viable pool survived the full {max_rounds} rounds in "
+        f"{survived}/{len(seeds)} seeds."
+    )
+    exhausted = sorted(p for p in adaptive_pools if p is not None)
+    if exhausted:
+        print(f"    - Where it did not, exhaustion occurred at rounds: {exhausted}")
+    print("    - This spread is the honest bound on the longevity claim; quote it "
+          "alongside the single-seed headline.")
 
 
 def main():
@@ -250,8 +339,19 @@ def main():
         default="drl",
         help="Committee election engine for demo: 'drl' (Deep RL PPO) or 'mcdm' (Heuristic)"
     )
+    parser.add_argument(
+        "--seeds",
+        type=int,
+        default=1,
+        help="Run a multi-seed robustness sweep instead of the standard benchmark (e.g. --seeds 6)"
+    )
 
     args = parser.parse_args()
+
+    if args.seeds > 1:
+        run_robustness(n_seeds=args.seeds, max_rounds=args.rounds)
+        print("\n[+] Robustness sweep finished successfully!\n")
+        return
 
     if args.mode in ("all", "demo"):
         run_consensus_demo(use_drl=(args.optimizer == "drl"))

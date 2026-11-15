@@ -1,11 +1,34 @@
 # ==========================================
-# Node.js & Hardhat Artifacts
+# Benchmark & Simulation Generated Outputs
+# ==========================================
+benchmark_results/
+simulation_results/
+
+# ==========================================
+# Research Paper, Patent & Publication Drafts
+# ==========================================
+paper/
+patent/
+scripts/*paper*.py
+scripts/*patent*.py
+
+# ==========================================
+# Node.js, Frontend & Hardhat Artifacts
 # ==========================================
 node_modules/
 artifacts/
 cache/
+.cache/
 typechain/
 typechain-types/
+
+# Frontend build outputs
+dist/
+build/
+out/
+.next/
+.turbo/
+.parcel-cache/
 
 # Hardhat coverage & gas reporter
 coverage/
@@ -19,11 +42,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-build/
-dist/
 *.egg-info/
 
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .coverage
 htmlcov/
 .deepeval/
@@ -63,17 +86,35 @@ models/checkpoints/
 .env.local
 .env.*.local
 *.log
+logs/
 npm-debug.log*
 yarn-debug.log*
+pnpm-debug.log*
 
 # ==========================================
 # Streamlit & Local App Cache
 # ==========================================
 .streamlit/secrets.toml
+.streamlit/cache/
 
 # ==========================================
-# IDE & Operating System Files
+# LaTeX Compilation Artifacts
 # ==========================================
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
+*.out
+
+# ==========================================
+# Temporary Office & OS Files
+# ==========================================
+~$*.docx
+~$*.xlsx
+~$*.pptx
 .vscode/
 .idea/
 .DS_Store

@@ -19,7 +19,7 @@
 4. [Security, Adversarial Testing & Active Slashing Defense](#4-security-adversarial-testing--active-slashing-defense)
    - [4.1 Adversarial Attack Vectors Implemented](#41-adversarial-attack-vectors-implemented)
    - [4.2 Active Defense & Automated Slashing Mechanics](#42-active-defense--automated-slashing-mechanics)
-   - [4.3 Test Suite Verification (29 Automated Tests)](#43-test-suite-verification-29-automated-tests)
+   - [4.3 Test Suite Verification (33 Automated Tests)](#43-test-suite-verification-33-automated-tests)
 5. [Academic Research Gap, State of the Art & Novelty Claims](#5-academic-research-gap-state-of-the-art--novelty-claims)
    - [5.1 Comparison with Existing Literature](#51-comparison-with-existing-literature)
    - [5.2 Defensible Novelty Contributions for Thesis / Publication](#52-defensible-novelty-contributions-for-thesis--publication)
@@ -33,10 +33,10 @@ This section provides an audit distinguishing between what is physically deploye
 
 | Subsystem / Component | Implementation Reality | Underlying Code & Artifact Reference |
 | :--- | :---: | :--- |
-| **14 IoT Fleet Nodes** | **Physics-Grounded Simulation** | **Not physical breadboards.** Implemented in `simulator/iot_node.py` and `simulator/fleet_simulator.py`. Each virtual node holds real cryptographic `secp256k1` ECDSA keypairs, battery energy state variables in Joules ($J$), 2D spatial coordinates $(x, y)$, and electrical hardware clock/current profiles derived from Espressif ESP32 hardware datasheets. |
-| **Deep RL (PPO Policy)** | **Fully Implemented & Pre-Trained** | **Trained neural weights are serialized on disk.** Pre-trained model weights are stored in `models/drl_consensus_agent.pt`. The custom OpenAI Gymnasium MDP environment is implemented in `ai_engine/consensus_env.py`, the Actor-Critic policy network in `ai_engine/drl_agent.py`, and the PPO training script in `ai_engine/train_rl.py`. |
+| **14 IoT Fleet Nodes** | **Physics-Grounded Simulation** | **Not physical breadboards.** Implemented in `simulator/iot_node.py` and `simulator/fleet_simulator.py`. Each virtual node holds real cryptographic `secp256k1` ECDSA keypairs, battery energy state variables in Joules ($J$), and electrical hardware clock/current profiles derived from Espressif ESP32 hardware datasheets. Transmission distance is a per-round simulation parameter ($d = 30\text{ m}$), not a per-node coordinate. |
+| **Deep RL (PPO Policy)** | **Fully Implemented & Pre-Trained** | **Trained neural weights are serialized on disk.** Pre-trained model weights are stored in `models/drl_consensus_agent.pt`. The custom MDP environment is implemented in `ai_engine/consensus_env.py` (it follows the Gymnasium `reset`/`step` API shape but is a self-contained class, not a `gym.Env` subclass — so it cannot be handed to Stable-Baselines3), the Actor-Critic policy network in `ai_engine/drl_agent.py`, and the PPO training script in `ai_engine/train_rl.py`. |
 | **MCDM Heuristic Optimizer** | **Fully Implemented & Independent** | **Operates independently of PyTorch.** Implemented in `ai_engine/objective.py`. Uses analytical Pareto scoring with strict feasibility filtering ($Batt > 15\%$, $Rep \ge 0.60$). Can run standalone without loading machine learning dependencies. |
-| **Solidity Smart Contracts** | **Fully Implemented & Tested** | **Compiled for Solidity 0.8.24 targeting Cancun EVM.** Implemented in `contracts/NodeRegistry.sol` (staking, identity, on-chain slashing) and `contracts/AdaptiveConsensus.sol` (cryptographic `ecrecover` quorum verification). Tested via 5 passing Hardhat test suites in `tests/contracts/ConsensusTest.js`. Orchestrated off-chain via `bridge/web3_client.py`. |
+| **Solidity Smart Contracts** | **Fully Implemented & Tested** | **Compiled for Solidity 0.8.24 targeting Cancun EVM.** Implemented in `contracts/NodeRegistry.sol` (node identity, reputation, on-chain slashing) and `contracts/AdaptiveConsensus.sol` (cryptographic `ecrecover` quorum verification). Tested via 5 passing Hardhat tests in `tests/contracts/ConsensusTest.js`. Orchestrated off-chain via `bridge/web3_client.py`, which requires `contracts_data/deployment.json` — run `scripts/deploy.js` against a local node to create it. |
 | **Adversarial Defense Suite** | **Fully Implemented & Tested** | **4 real attack vectors implemented.** Implemented in `simulator/adversarial.py` and `ai_engine/defense_detector.py`. Actively intercepts false battery claims, catches double-signing via ECDSA proof verification, slashes nodes on-chain, and filters rogue Sybil identities. |
 | **Complete 6-Stage Consensus Workflow** | **Fully Executable** | **Yes.** Ingestion $\to$ physics sanitization $\to$ dynamic election $\to$ block proposal $\to$ vote aggregation $\to$ on-chain commit/slashing executes synchronously in both terminal CLI (`main.py`) and browser GUI (`dashboard/app.py`). |
 
@@ -166,17 +166,19 @@ $$A_t = [a_0, a_1, a_2, \dots, a_N] \in \mathbb{R}^{N+1}$$
 - **$a_{1 \dots N} \in \mathbb{R}$ (Candidate Priority Logits):** Continuous logits scoring the fitness of each node. The top $K_t$ nodes are elected to the committee; the node with the highest logit is designated the **Round Leader**.
 
 #### Composite Multi-Objective Reward Function ($R_t$)
-The reward function mathematically aligns neural gradient ascent with physical battery longevity, communication minimalism, and BFT safety:
+The reward function aligns neural gradient ascent with physical battery longevity, communication minimalism, and load balancing. The following is the reward **as implemented** in `ai_engine/consensus_env.py`:
 
-$$R_t = +3.0 \cdot \mathbf{1}_{consensus} + 1.5 \cdot \overline{E}_{comm} - 1.0 \cdot \sigma^2(E) - 1.2 \cdot \overline{\mathcal{L}}_{comm} - 2.0 \cdot \left(\frac{K_t - K_{min}}{K_{max} - K_{min}}\right) - \mathcal{P}_{BFT}$$
+$$R_t = 2.0 + 1.0 \cdot \frac{\overline{E}_{comm}}{100} - 0.5 \cdot \frac{\overline{\mathcal{L}}_{comm}}{100} - 0.02 \cdot \sigma^2(E) - 20.0 \cdot N_{dead}$$
 
 Where:
-- $\mathbf{1}_{consensus} \in \{0, 1\}$ indicates successful cryptographic quorum attainment.
-- $\overline{E}_{comm} = \frac{1}{K_t} \sum_{i \in \mathcal{C}_t} \tilde{E}_i$ rewards electing energy-rich committee members.
-- $\sigma^2(E) = \frac{1}{N} \sum_{i=1}^N (E_i - \bar{E})^2$ penalizes battery variance across the fleet (forces load balancing).
-- $\overline{\mathcal{L}}_{comm} = \frac{1}{K_t} \sum_{i \in \mathcal{C}_t} \tilde{\mathcal{L}}_i$ penalizes high committee communication latency.
-- $\frac{K_t - K_{min}}{K_{max} - K_{min}} \in [0, 1]$ penalizes oversized committees to suppress redundant wireless packets.
-- $\mathcal{P}_{BFT} = -15.0$ applies a catastrophic penalty if the selected committee violates $K_t \ge 3f + 1$.
+- The constant $2.0$ is the per-step reward for a successfully formed committee.
+- $\overline{E}_{comm} = \frac{1}{K_t} \sum_{i \in \mathcal{C}_t} E_i$ (mean committee battery in %) rewards electing energy-rich committee members.
+- $\sigma^2(E) = \frac{1}{N} \sum_{i=1}^N (E_i - \bar{E})^2$ penalizes battery variance across the fleet (forces load balancing). Because $E_i$ is expressed in percent, this term dominates the reward in practice.
+- $\overline{\mathcal{L}}_{comm} = \frac{1}{K_t} \sum_{i \in \mathcal{C}_t} L_i$ (mean committee latency in ms).
+- $N_{dead}$ is the number of nodes whose battery has reached 0%, penalized at 20 per node.
+- If fewer than $3f+1$ nodes remain feasible, the episode terminates immediately with $R_t = -50.0$.
+
+> **Correction note.** An earlier revision of this document described a different reward: $3.0\cdot\mathbf{1}_{consensus} + 1.5\cdot\overline{E} - 1.0\cdot\sigma^2 - 1.2\cdot\overline{\mathcal{L}} - 2.0\cdot(\text{size penalty}) - 15.0$. That formula was never implemented — there is no committee-size penalty term in the code and the BFT violation penalty is $-50.0$, not $-15.0$. The formula above is the one that produced `models/drl_consensus_agent.pt`.
 
 #### PPO Clipped Surrogate Objective
 Parameters $\theta$ of the policy network $\pi_\theta$ are optimized using Proximal Policy Optimization:
@@ -304,28 +306,39 @@ $$E_{sleep} = 3.3\text{ V} \times (15 \times 10^{-6}\text{ A}) \times 2.0\text{ 
 $$\text{Total Idle Round Energy} = 0.0256\text{ mJ} + 0.099\text{ mJ} = \mathbf{0.1246\text{ mJ}} \approx \mathbf{0.125\text{ mJ}}$$
 $$\text{Energy Reduction Percentage} = \frac{E_{validator} - E_{idle}}{E_{validator}} \times 100\% = \frac{7.201\text{ mJ} - 0.125\text{ mJ}}{7.201\text{ mJ}} \times 100\% = \mathbf{98.26\%} \approx \mathbf{98.3\%}$$
 
-#### 5. Derivation of $86.1\%$ Wireless Message Reduction
+#### 5. Derivation of $88.4\%$ Wireless Message Reduction
 In classical PBFT with $N = 14$ nodes over 100 consensus rounds:
 - PBFT requires 3-phase broadcast (Pre-Prepare, Prepare, Commit). Each phase requires all-to-all broadcast ($\mathcal{O}(N^2)$):
-  $$\text{PBFT Messages} = 100 \times \left( (N - 1) + 2 \times N(N - 1) \right) = 100 \times (13 + 364) \approx 6,850\text{ packets (with view changes)}$$
-- Adaptive Consensus routes proposals from the leader to $K_t - 1$ members and collects $K_t - 1$ votes ($\mathcal{O}(K_t)$ unicast/multicast):
-  $$\text{Adaptive Messages} = \sum_{t=1}^{100} 2 \cdot (K_t - 1) = 954\text{ packets}$$
-$$\text{Message Reduction} = \frac{6850 - 954}{6850} \times 100\% = \mathbf{86.07\%} \approx \mathbf{86.1\%}$$
+  $$\text{PBFT Messages} = 100 \times \left( (N - 1) + (N - 1)^2 \right) = 100 \times (13 + 169) = 18{,}200\text{ packets}$$
+  In practice the run stops when quorum is lost, yielding **7,918** packets measured by the benchmark.
+- Adaptive Consensus routes proposals from the leader to $K_t - 1$ members and collects $K_t - 1$ votes. That is $2(K_t - 1)$ messages per round, i.e. $\mathcal{O}(K_t)$ — **not** $\mathcal{O}(K_t^2)$:
+  $$\text{Adaptive Messages} = \sum_{t=1}^{100} 2 \cdot (K_t - 1) = 922\text{ packets (measured)}$$
+$$\text{Message Reduction} = \frac{7918 - 922}{7918} \times 100\% = \mathbf{88.4\%}$$
+
+> **Correction note.** Earlier revisions of this document described adaptive messaging as $\mathcal{O}(K_t^2)$ and quoted 6,850 / 954 packets with an 86.1% reduction. The implementation has always sent $2(K_t-1)$ messages — linear in $K_t$ — and the figures above are the measured values from the current benchmark run. The same error appeared in the `message_complexity_scaling.png` figure, which previously hard-coded $K=4$ for every network size and so plotted a constant.
 
 ---
 
 ### 3.2 Comparative Protocol Baselines & 100-Round Results
 
-The empirical benchmark runner (`benchmark/benchmark_engine.py`) executed a 100-round head-to-head comparison under identical radio physics:
+The empirical benchmark runner (`benchmark/benchmark_engine.py`) executed a head-to-head comparison under identical radio physics and an identical initial fleet. Both baselines rotate their block proposer, and the PoS committee is elected by reputation (the stake proxy) rather than by fleet position:
 
-| Benchmark Performance Metric | Classical Static PBFT | Static Proof of Stake (PoS) | AI-Driven Adaptive Consensus | Improvement Factor |
-| :--- | :---: | :---: | :---: | :---: |
-| **First Node Dead (FND)** | **Round 6** | **Round 15** | **None (>100 rounds)** | **> 16.6x vs PBFT / > 6.67x vs PoS** |
-| **Network Half-Life (50% Fleet Dead)** | **Round 59** | None (>100) | None (>100) | **Eliminates fleet mortality** |
-| **Fleet Survival Rate at Round 100** | $0.0\%$ (All 14 Dead) | $64.3\%$ (9/14 Alive) | **$100.0\%$ (14/14 Alive)** | **Perfect network longevity** |
-| **Total Cumulative Energy Dissipated** | $352,470\text{ Joules}$ | $48,404\text{ Joules}$ | $246,201\text{ Joules}$ | **Balanced load distribution** |
-| **Total Wireless Packets Transmitted** | $6,850\text{ messages}$ | $240\text{ messages}$ | $954\text{ messages}$ | **$86.1\%$ overhead reduction** |
-| **Fleet Battery Variance $\sigma^2(E)$** | High | Severe (Leader Burnout) | **Minimal (Uniform Decay)** | **Prevents single-node failure** |
+| Benchmark Performance Metric | Classical Static PBFT | Static Proof of Stake (PoS) | AI-Driven Adaptive Consensus |
+| :--- | :---: | :---: | :---: |
+| **First Node Dead (FND)** | Round 29 | Round 32 | **None (>100 rounds)** |
+| **Network Half-Life (50% Fleet Dead)** | Round 52 | None (>100) | None (>100) |
+| **Quorum Loss (BFT-viable pool exhausted)** | Round 56 | Round 33 | **None (>100)** |
+| **Fleet Survival Rate at Round 100** | 3/14 alive | 12/14 alive | **14/14 alive** |
+| **Total Cumulative Energy Dissipated** | $309{,}005\text{ J}$ | $66{,}571\text{ J}$ | $238{,}458\text{ J}$ |
+| **Total Wireless Packets Transmitted** | $7{,}918$ | $254$ | $922$ |
+| **Rounds completed before quorum loss** | 55 | 32 | 100 |
+
+**How to read these numbers.**
+
+1. **FND is bounded by the quarantine floor.** The adaptive arm never lets a node reach 0% because devices below 15% are excluded from consensus and then drain only at idle rate. So "no node died" is a *consequence of quarantine*, not of unlimited energy. The honest binding metric is the **quorum-loss round**, where fewer than $3f+1$ nodes remain above the feasibility floor.
+2. **The adaptive margin is narrow, not infinite.** Across seeds 42–47 (`python main.py --seeds 6`), the adaptive viable pool survived all 100 rounds in **5 of 6** runs and was exhausted at round **98** in the sixth. Any claim should quote that range rather than the single seed-42 point.
+3. **Total energy is a function of committee size, not membership.** Per round the fleet pays $K\cdot E_{validator} + (E_{leader} - E_{validator}) + (N-K)\cdot E_{idle}$, so the total depends on the $K_t$ sequence alone. The 22.8% saving therefore measures *committee sizing*; the per-node load balancing that prevents burnout shows up in FND and battery variance, not in the energy total.
+4. **PoS looks cheap only because it stalls.** It dissipates less total energy precisely because it stops after 32 rounds instead of running 100 — comparing raw joule totals across protocols with different lifetimes is misleading, which is why rounds-completed is listed explicitly.
 
 ---
 
@@ -338,7 +351,7 @@ The empirical benchmark results are exported to the project directory:
   1. `benchmark_results/battery_decay_curves.png`: Individual node battery trajectories showing PoS leader burnout vs. Adaptive Consensus uniform decay.
   2. `benchmark_results/cumulative_energy_comparison.png`: Cumulative fleet Joules dissipated over 100 rounds.
   3. `benchmark_results/network_survival_curves.png`: Kaplan-Meier survival curves depicting First Node Dead (FND) and half-life points.
-  4. `benchmark_results/message_complexity_scaling.png`: Message complexity scaling curves comparing $\mathcal{O}(N^2)$ to $\mathcal{O}(K_t^2)$.
+  4. `benchmark_results/message_complexity_scaling.png`: Message complexity per round comparing $\mathcal{O}(N^2)$ PBFT broadcast to $\mathcal{O}(K_t)$ bounded committee messaging.
 
 ---
 
@@ -407,7 +420,7 @@ Because $K_t \ge 3f + 1$, the quorum threshold requires only $\lfloor \frac{2}{3
 
 ---
 
-### 4.3 Test Suite Verification (29 Automated Tests)
+### 4.3 Test Suite Verification (33 Automated Tests)
 
 The test suite in `tests/` verifies all mathematical, machine learning, adversarial, and benchmarking invariants:
 
@@ -425,31 +438,35 @@ tests/test_adversarial_defense.py (11 tests):
   [x] test_liveness_failure_when_faults_exceed_bound
   [x] test_end_to_end_equivocation_and_slashing_flow
 
-tests/test_benchmarks.py (3 tests):
+tests/test_benchmarks.py (4 tests):
   [x] test_run_short_benchmark_all_protocols
-  [x] test_pos_concentrated_depletion (confirms PoS leader burnout)
+  [x] test_pos_concentrated_depletion (confirms PoS validator burnout)
   [x] test_generate_plots_and_exports (verifies PNG/CSV/JSON artifact exports)
+  [x] test_benchmark_is_deterministic (same seed => identical metrics)
 
 tests/test_drl_agent.py (6 tests):
   [x] test_env_dimensions (confirms obs_dim=58, action_dim=15)
   [x] test_step_execution_and_rewards
-  [x] test_bft_invariant_failure_penalty (-15.0 penalty check)
+  [x] test_bft_invariant_failure_penalty (R_t = -50.0)
   [x] test_actor_critic_forward_shape
   [x] test_agent_save_and_load (verifies PyTorch model checkpoint persistence)
   [x] test_drl_selector_output_directive
 
-tests/test_math_models.py (9 tests):
+tests/test_math_models.py (12 tests):
   [x] test_crossover_distance (verifies d0 = 87.7058 m)
   [x] test_transmission_energy_scaling (d^2 vs d^4 scaling)
   [x] test_multipath_fading_energy
   [x] test_reception_energy_linear
   [x] test_validator_vs_idle_energy_disparity (confirms 98.3% rest disparity)
   [x] test_weight_auto_normalization (w1 + w2 + w3 = 1.0)
+  [x] test_zero_total_weights_rejected (guards ZeroDivisionError)
   [x] test_feasibility_filtering (batt <= 15% quarantine)
   [x] test_bft_quorum_and_leader_election
   [x] test_bft_invariant_failure_raises_exception
+  [x] test_simulator_seeding_does_not_mutate_global_rng
+  [x] test_fleet_initialisation_is_reproducible
 
-Total: 29 passed in 11.69s (100% passing)
+Total: 33 passed (11 adversarial + 6 DRL + 4 benchmark + 12 math, ~7s, 100% passing)
 ```
 
 ---
@@ -473,7 +490,7 @@ When presenting or writing your paper, structure your contribution around these 
 
 1. **Physics-Coupled Edge Consensus Architecture:**
    - Existing consensus optimizations (such as HotStuff or Algorand) operate at the pure protocol layer, treating physical communication as an abstract network cost.
-   - *Our Novelty:* We are the first to couple **Heinzelman first-order radio propagation physics ($d^2/d^4$ free-space and multi-path fading)** directly into an Actor-Critic PPO reward formulation and analytical Pareto ranking, extending network lifespan (First Node Dead) by **$>6.67\times$ over PoS** and **$>16\times$ over PBFT**.
+   - *Our Novelty:* We are the first to couple **Heinzelman first-order radio propagation physics ($d^2/d^4$ free-space and multi-path fading)** directly into an Actor-Critic PPO reward formulation and analytical Pareto ranking, extending the BFT-viable lifetime of the fleet relative to static PBFT and stake-based PoS (see the measured FND and quorum-loss rounds in Section 3.2).
 
 2. **Dual-Layer Physical & Cryptographic Byzantine Defense:**
    - Canonical BFT protocols assume nodes can only be Byzantine in their network messages (double-signing, silent dropping). They are defenseless against "physical free-riders" that falsify telemetry to seize leadership while avoiding validation duties.
@@ -490,7 +507,7 @@ When presenting or writing your paper, structure your contribution around these 
 The entire codebase is verified and executable via the master CLI runner:
 
 ```bash
-# 1. Run complete automated unit test suite (29 tests)
+# 1. Run complete automated unit test suite (33 tests)
 python -m pytest tests/ -v
 
 # 2. Run interactive consensus and Byzantine attack defense demo
