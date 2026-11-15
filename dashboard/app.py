@@ -491,22 +491,66 @@ def chart_battery_decay():
         )
         return
     df = pd.DataFrame(st.session_state.battery_history)
-    c = (
-        alt.Chart(df)
-        .mark_line(strokeWidth=1.6)
-        .encode(
-            x=alt.X("Epoch:Q", title="Epoch"),
-            y=alt.Y("Battery %:Q", title="Battery remaining (%)", scale=alt.Scale(domain=[0, 100])),
-            color=alt.Color("Node:N", legend=alt.Legend(columns=2, symbolLimit=0, title=None)),
-            tooltip=[
-                alt.Tooltip("Node:N"),
-                alt.Tooltip("Epoch:Q"),
-                alt.Tooltip("Battery %:Q", format=",.1f"),
-            ],
+
+    # UI toggle for scale mode: lets user see small micro-discharges or full 0-100% macro view
+    col_scale, _ = st.columns([3, 2])
+    with col_scale:
+        scale_mode = st.radio(
+            "Battery Scale Mode",
+            ["Auto-Zoom (Detect Minor Changes)", "Energy Depleted (Δ Loss %)", "Full Scale (0 - 100%)"],
+            horizontal=True,
+            index=0,
+            key="decay_scale_mode",
+            label_visibility="collapsed",
         )
-        .properties(height=320)
-        .interactive()
-    )
+
+    if scale_mode == "Energy Depleted (Δ Loss %)":
+        # Calculate cumulative battery loss relative to starting value
+        initial_map = df.groupby("Node")["Battery %"].first().to_dict()
+        df["Loss %"] = df.apply(lambda r: round(max(0.0, initial_map[r["Node"]] - r["Battery %"]), 3), axis=1)
+        c = (
+            alt.Chart(df)
+            .mark_line(strokeWidth=1.8, point=True)
+            .encode(
+                x=alt.X("Epoch:Q", title="Epoch"),
+                y=alt.Y("Loss %:Q", title="Cumulative Battery Loss (%)", scale=alt.Scale(zero=True)),
+                color=alt.Color("Node:N", legend=alt.Legend(columns=2, symbolLimit=0, title=None)),
+                tooltip=[
+                    alt.Tooltip("Node:N"),
+                    alt.Tooltip("Epoch:Q"),
+                    alt.Tooltip("Loss %:Q", title="Depleted %", format=",.3f"),
+                    alt.Tooltip("Battery %:Q", title="Remaining %", format=",.2f"),
+                ],
+            )
+            .properties(height=320)
+            .interactive()
+        )
+    else:
+        if scale_mode == "Auto-Zoom (Detect Minor Changes)":
+            b_min = float(df["Battery %"].min())
+            b_max = float(df["Battery %"].max())
+            spread = b_max - b_min
+            pad = max(0.15, spread * 0.12) if spread > 0 else 0.5
+            y_scale = alt.Scale(domain=[max(0.0, b_min - pad), min(100.0, b_max + pad)], zero=False)
+        else:
+            y_scale = alt.Scale(domain=[0, 100])
+
+        c = (
+            alt.Chart(df)
+            .mark_line(strokeWidth=1.8)
+            .encode(
+                x=alt.X("Epoch:Q", title="Epoch"),
+                y=alt.Y("Battery %:Q", title="Battery remaining (%)", scale=y_scale),
+                color=alt.Color("Node:N", legend=alt.Legend(columns=2, symbolLimit=0, title=None)),
+                tooltip=[
+                    alt.Tooltip("Node:N"),
+                    alt.Tooltip("Epoch:Q"),
+                    alt.Tooltip("Battery %:Q", format=",.2f"),
+                ],
+            )
+            .properties(height=320)
+            .interactive()
+        )
     st.altair_chart(_finalize(c), width="stretch")
 
 
@@ -553,23 +597,53 @@ def chart_fleet_health():
             unsafe_allow_html=True,
         )
         return
+
+    # Visual legend banner explicitly identifying the two lines and their dual axes
+    st.markdown(
+        '<div style="display:flex; flex-wrap:wrap; gap:16px; margin:2px 0 10px; font-size:12px; font-weight:600;">'
+        '<span style="display:inline-flex; align-items:center; gap:6px; color:#4ea1d3;">'
+        '<span style="width:12px; height:12px; background:#4ea1d3; border-radius:3px; display:inline-block;"></span>'
+        '🔵 Blue Line: Avg Committee Battery (%) [Left Axis]</span>'
+        '<span style="display:inline-flex; align-items:center; gap:6px; color:#2fbf71;">'
+        '<span style="width:12px; height:12px; background:#2fbf71; border-radius:3px; display:inline-block;"></span>'
+        '🟢 Green Line: AI Multi-Objective Utility Score U(c) [Right Axis]</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
     df = pd.DataFrame(st.session_state.epoch_history)
     l_battery = (
         alt.Chart(df)
-        .mark_line(color="#4ea1d3", strokeWidth=2)
+        .mark_line(color="#4ea1d3", strokeWidth=2.2)
         .encode(
             x=alt.X("Epoch:Q", title="Epoch"),
-            y=alt.Y("Avg Battery %:Q", title="Avg battery (%)", scale=alt.Scale(domain=[0, 100])),
-            tooltip=[alt.Tooltip("Avg Battery %:Q", format=",.1f")],
+            y=alt.Y(
+                "Avg Battery %:Q",
+                title="Avg Committee Battery (%)",
+                axis=alt.Axis(titleColor="#4ea1d3", labelColor="#4ea1d3"),
+                scale=alt.Scale(zero=False),
+            ),
+            tooltip=[
+                alt.Tooltip("Epoch:Q"),
+                alt.Tooltip("Avg Battery %:Q", title="Avg Battery (%)", format=",.2f"),
+            ],
         )
     )
     l_utility = (
         alt.Chart(df)
-        .mark_line(color="#2fbf71", strokeWidth=2)
+        .mark_line(color="#2fbf71", strokeWidth=2.2)
         .encode(
             x=alt.X("Epoch:Q", title="Epoch"),
-            y=alt.Y("Utility:Q", title="Utility score", scale=alt.Scale(zero=False)),
-            tooltip=[alt.Tooltip("Utility:Q", format=",.3f")],
+            y=alt.Y(
+                "Utility:Q",
+                title="AI Utility Score U(c)",
+                axis=alt.Axis(titleColor="#2fbf71", labelColor="#2fbf71"),
+                scale=alt.Scale(zero=False),
+            ),
+            tooltip=[
+                alt.Tooltip("Epoch:Q"),
+                alt.Tooltip("Utility:Q", title="AI Utility Score", format=",.3f"),
+            ],
         )
     )
     c = alt.layer(l_battery, l_utility).resolve_scale(y="independent").properties(height=280)
@@ -775,7 +849,7 @@ def render_energy_tab():
         section_head("Committee Sizing per Epoch", "Bars: committee size K. Dashed line: quorum threshold")
         chart_committee()
     with col_right:
-        section_head("Fleet Health Trajectory", "Blue: avg committee battery. Green: utility score")
+        section_head("Fleet Health Trajectory", "Blue (Left Axis): Avg Committee Battery (%). Green (Right Axis): AI Utility Score U(c)")
         chart_fleet_health()
 
 
